@@ -1,0 +1,78 @@
+.popup-shell {
+  width: 320px;
+  min-height: 240px;
+  padding: 16px;
+  box-sizing: border-box;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.body-copy {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1e293b;
+}
+
+.body-copy.secondary {
+  color: #475569;
+}
+
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 14px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.status,
+.error {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.status {
+  color: #0f766e;
+}
+
+.error {
+  color: #b91c1c;
+}
