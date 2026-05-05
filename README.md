@@ -10,14 +10,6 @@ Anything Reader is a browser extension that extracts readable text from the acti
 
 The Mac app is required for the extension to work. The browser extension does not render or store the full reading experience by itself; it hands the cleaned page text to the local Mac app.
 
-## What It Does
-
-1. Shows a welcome screen explaining that the Mac app is required.
-2. After the user clicks `Next`, shows `Read with Anything Reader`.
-3. On click, the extension extracts readable page text from the active tab.
-4. It removes page chrome such as navigation, menus, pagination, sidebars, ads, and similar noise.
-5. It sends the extracted text to the local native messaging host used by the Mac app.
-
 ## How It Works
 
 The extension is split into three parts:
