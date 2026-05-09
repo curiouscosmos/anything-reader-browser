@@ -14,16 +14,20 @@ type ReadResult =
       error: string;
     };
 
+type ActionKind = 'read' | 'summarize';
+
 function App() {
   const [step, setStep] = useState<'welcome' | 'ready'>('welcome');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
-  const [isReading, setIsReading] = useState(false);
+  const [isBusyAction, setIsBusyAction] = useState<ActionKind | null>(null);
 
-  async function handleReadClick() {
-    console.log(DEBUG_PREFIX, 'Read button pressed');
-    setIsReading(true);
-    setStatus('Reading the active page...');
+  async function handleActionClick(action: ActionKind) {
+    const isSummarize = action === 'summarize';
+    const actionLabel = isSummarize ? 'Summarizing the active page...' : 'Reading the active page...';
+    console.log(DEBUG_PREFIX, `${action} button pressed`);
+    setIsBusyAction(action);
+    setStatus(actionLabel);
     setError('');
 
     try {
@@ -31,6 +35,7 @@ function App() {
       // extension can coordinate tab access and native messaging in one place.
       const request = {
         type: READ_CURRENT_PAGE_MESSAGE,
+        summarize: isSummarize,
       };
       console.log(DEBUG_PREFIX, 'Sending request to background', request);
 
@@ -41,7 +46,11 @@ function App() {
         throw new Error(response?.error ?? 'Unable to read the current page.');
       }
 
-      setStatus(`Sent ${response.textLength.toLocaleString()} characters to Anything Reader.`);
+      setStatus(
+        isSummarize
+          ? `Sent ${response.textLength.toLocaleString()} characters to Anything Reader with summarize enabled.`
+          : `Sent ${response.textLength.toLocaleString()} characters to Anything Reader.`,
+      );
     } catch (err) {
       const message =
         typeof err === 'string'
@@ -49,12 +58,12 @@ function App() {
           : err instanceof Error
             ? err.message || err.name
             : 'Unable to read the current page.';
-      console.error(DEBUG_PREFIX, 'Read flow failed', err);
+      console.error(DEBUG_PREFIX, `${action} flow failed`, err);
       setError(message);
       setStatus('');
     } finally {
-      console.log(DEBUG_PREFIX, 'Read flow finished');
-      setIsReading(false);
+      console.log(DEBUG_PREFIX, `${action} flow finished`);
+      setIsBusyAction(null);
     }
   }
 
@@ -81,14 +90,24 @@ function App() {
           <p className="body-copy">
             This extracts the readable text from the active tab and sends it to the local Mac app.
           </p>
-          <button
-            type="button"
-            className="primary-button"
-            onClick={handleReadClick}
-            disabled={isReading}
-          >
-            {isReading ? 'Reading…' : 'Read with Anything Reader'}
-          </button>
+          <div className="button-row">
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => handleActionClick('read')}
+              disabled={isBusyAction !== null}
+            >
+              {isBusyAction === 'read' ? 'Reading…' : 'Read with Anything Reader'}
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => handleActionClick('summarize')}
+              disabled={isBusyAction !== null}
+            >
+              {isBusyAction === 'summarize' ? 'Summarizing…' : 'Summarize'}
+            </button>
+          </div>
           {status ? <p className="status">{status}</p> : null}
           {error ? <p className="error">{error}</p> : null}
         </section>

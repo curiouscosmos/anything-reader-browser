@@ -13,6 +13,11 @@
   gap: 12px;
 }
 
+.button-row {
+  display: flex;
+  gap: 8px;
+}
+
 .eyebrow {
   margin: 0;
   font-size: 12px;
@@ -42,6 +47,7 @@ h1 {
 }
 
 .primary-button {
+  flex: 1 1 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -57,7 +63,34 @@ h1 {
   cursor: pointer;
 }
 
+.secondary-button {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0 14px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.primary-button:hover:not(:disabled),
+.secondary-button:hover:not(:disabled) {
+  filter: brightness(0.98);
+}
+
 .primary-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.secondary-button:disabled {
   cursor: wait;
   opacity: 0.72;
 }

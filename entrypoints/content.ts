@@ -68,6 +68,7 @@ type ExtractResult =
   | {
       ok: true;
       title: string;
+      site: string;
       url: string;
       text: string;
       textLength: number;
@@ -108,10 +109,12 @@ function extractReadableText(): ExtractResult {
 
   const rawText = getReadableText(clone);
   const text = normalizeText(rawText);
+  const site = getSiteName(document);
   console.log(DEBUG_PREFIX, 'Extracted raw text metrics', {
     rawLength: rawText.length,
     normalizedLength: text.length,
     title: document.title.trim(),
+    site,
     url: location.href,
     preview: text.slice(0, 500),
   });
@@ -127,6 +130,7 @@ function extractReadableText(): ExtractResult {
   return {
     ok: true,
     title: document.title.trim(),
+    site,
     url: location.href,
     text,
     textLength: text.length,
@@ -232,6 +236,25 @@ function normalizeText(text: string): string {
 
 function normalizeWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
+}
+
+function getSiteName(doc: Document): string {
+  const candidates = [
+    'meta[property="og:site_name"]',
+    'meta[name="application-name"]',
+    'meta[name="apple-mobile-web-app-title"]',
+    'meta[name="publisher"]',
+  ];
+
+  for (const selector of candidates) {
+    const content = doc.querySelector(selector)?.getAttribute('content')?.trim();
+    if (content) {
+      return content;
+    }
+  }
+
+  const hostname = location.hostname.replace(/^www\./, '').trim();
+  return hostname || doc.title.trim() || 'Unknown site';
 }
 
 function describeElement(element: Element): Record<string, string | number | undefined> {

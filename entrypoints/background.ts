@@ -8,6 +8,7 @@ type ExtractResult =
   | {
       ok: true;
       title: string;
+      site: string;
       url: string;
       text: string;
       textLength: number;
@@ -26,6 +27,20 @@ type ReadResult =
       ok: false;
       error: string;
     };
+
+type NativePayload = {
+  title: string;
+  site: string;
+  url: string;
+  text: string;
+  textLength: number;
+  summarize?: true;
+};
+
+type ReadCurrentPageRequest = {
+  type: typeof READ_CURRENT_PAGE_MESSAGE;
+  summarize?: boolean;
+};
 
 export default defineBackground(() => {
   const manifest = browser.runtime.getManifest() as {
@@ -58,7 +73,7 @@ export default defineBackground(() => {
     }
 
     console.log(DEBUG_PREFIX, 'Received read request from popup', message);
-    void readCurrentPageAndSendToMac()
+    void readCurrentPageAndSendToMac(message.summarize === true)
       .then((result) => {
         console.log(DEBUG_PREFIX, 'Sending read result back to popup', result);
         sendResponse(result);
@@ -77,11 +92,16 @@ export default defineBackground(() => {
   });
 });
 
-function isReadCurrentPageRequest(message: unknown): message is { type: string } {
-  return typeof message === 'object' && message !== null && 'type' in message && (message as { type?: unknown }).type === READ_CURRENT_PAGE_MESSAGE;
+function isReadCurrentPageRequest(message: unknown): message is ReadCurrentPageRequest {
+  return (
+    typeof message === 'object' &&
+    message !== null &&
+    'type' in message &&
+    (message as { type?: unknown }).type === READ_CURRENT_PAGE_MESSAGE
+  );
 }
 
-async function readCurrentPageAndSendToMac(): Promise<ReadResult> {
+async function readCurrentPageAndSendToMac(summarize: boolean): Promise<ReadResult> {
   try {
     const tab = await getActiveTab();
     console.log(DEBUG_PREFIX, 'Active tab lookup result', tab);
@@ -124,6 +144,7 @@ async function readCurrentPageAndSendToMac(): Promise<ReadResult> {
     const text = clampText(normalizeText(extracted.text));
     console.log(DEBUG_PREFIX, 'Normalized extracted text', {
       title: extracted.title,
+      site: extracted.site,
       url: extracted.url,
       textLength: text.length,
       preview: text.slice(0, 500),
@@ -140,16 +161,21 @@ async function readCurrentPageAndSendToMac(): Promise<ReadResult> {
     console.log(DEBUG_PREFIX, 'Sending payload to native host', {
       host: NATIVE_HOST_NAME,
       title: extracted.title,
+      site: extracted.site,
       url: extracted.url,
       textLength: text.length,
+      summarize,
       preview: text.slice(0, 500),
     });
-    await sendTextToNativeApp({
+    const payload: NativePayload = {
       title: extracted.title,
+      site: extracted.site,
       url: extracted.url,
       text,
       textLength: text.length,
-    });
+      ...(summarize ? { summarize: true as const } : {}),
+    };
+    await sendTextToNativeApp(payload);
     console.log(DEBUG_PREFIX, 'Native host accepted payload');
 
     return {
@@ -174,13 +200,15 @@ async function getActiveTab() {
   return tab;
 }
 
-async function sendTextToNativeApp(payload: {
-  title: string;
-  url: string;
-  text: string;
-  textLength: number;
-}) {
+async function sendTextToNativeApp(payload: NativePayload) {
   try {
+    // Native host contract:
+    // - `type` identifies the browser-to-host message.
+    // - `payload` contains page metadata and text.
+    // - `payload.summarize === true` tells the host to summarize instead of
+    //   performing the default read handoff.
+    // Failure states are reported back as a rejected native message call or a
+    // host response with `{ ok: false, error: string }`.
     const response = await browser.runtime.sendNativeMessage(NATIVE_HOST_NAME, {
       type: 'anything-reader:page-text',
       payload,

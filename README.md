@@ -101,9 +101,11 @@ Firefox uses `allowed_extensions` instead of Chrome’s `allowed_origins`.
 The browser extension sends the native host a JSON payload containing:
 
 - page title
+- site name
 - page URL
 - extracted text
 - text length
+- optional `summarize: true` flag when the user chooses the summarize action
 
 The host is expected to:
 
