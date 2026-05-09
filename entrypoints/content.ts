@@ -1,68 +1,7 @@
+import { extractReadableTextFromDocument } from '../lib/readable-text';
+
 const EXTRACT_READABLE_TEXT_MESSAGE = 'anything-reader:extract-readable-text';
 const DEBUG_PREFIX = '[Anything Reader][Content]';
-
-const NOISE_SELECTORS = [
-  'script',
-  'style',
-  'noscript',
-  'svg',
-  'canvas',
-  'iframe',
-  'object',
-  'embed',
-  'template',
-  'nav',
-  'footer',
-  'header',
-  'aside',
-  'form',
-  'button',
-  'input',
-  'select',
-  'textarea',
-  '[role="navigation"]',
-  '[role="banner"]',
-  '[role="complementary"]',
-  '[role="contentinfo"]',
-  '[role="search"]',
-  '[role="menu"]',
-].join(',');
-
-const NOISE_KEYWORDS = [
-  'nav',
-  'menu',
-  'pagination',
-  'pager',
-  'breadcrumb',
-  'sidebar',
-  'aside',
-  'footer',
-  'header',
-  'toolbar',
-  'share',
-  'social',
-  'subscribe',
-  'promo',
-  'advert',
-  'ads',
-  'ad-',
-  'comment',
-  'related',
-  'recommended',
-  'sponsored',
-  'cookie',
-  'consent',
-  'modal',
-  'popup',
-  'overlay',
-  'newsletter',
-  'toc',
-  'tableofcontents',
-  'table-of-contents',
-  'page-number',
-  'filter',
-  'sort',
-];
 
 type ExtractResult =
   | {
@@ -100,172 +39,23 @@ function isExtractRequest(message: unknown): message is { type: string } {
 }
 
 function extractReadableText(): ExtractResult {
-  console.log(DEBUG_PREFIX, 'Starting extraction');
-  const root = selectCandidateRoot(document);
-  console.log(DEBUG_PREFIX, 'Selected candidate root', describeElement(root));
-  const clone = root.cloneNode(true) as HTMLElement;
-
-  pruneNoise(clone);
-
-  const rawText = getReadableText(clone);
-  const text = normalizeText(rawText);
-  const site = getSiteName(document);
-  console.log(DEBUG_PREFIX, 'Extracted raw text metrics', {
-    rawLength: rawText.length,
-    normalizedLength: text.length,
-    title: document.title.trim(),
-    site,
-    url: location.href,
-    preview: text.slice(0, 500),
-  });
-
-  if (!text) {
-    console.error(DEBUG_PREFIX, 'No readable text found after extraction');
+  try {
+    const result = extractReadableTextFromDocument(document);
+    console.log(DEBUG_PREFIX, 'Extraction result', {
+      ok: result.ok,
+      title: result.ok ? result.title : document.title.trim(),
+      site: result.ok ? result.site : location.hostname,
+      url: location.href,
+      textLength: result.ok ? result.textLength : 0,
+      preview: result.ok ? result.text.slice(0, 500) : undefined,
+    });
+    return result;
+  } catch (error) {
+    console.error(DEBUG_PREFIX, 'Readability extraction failed', error);
     return {
       ok: false,
-      error: 'No readable text was found on this page.',
+      error: error instanceof Error && error.message ? error.message : 'No readable text was found on this page.',
     };
   }
-
-  return {
-    ok: true,
-    title: document.title.trim(),
-    site,
-    url: location.href,
-    text,
-    textLength: text.length,
-  };
 }
 
-function selectCandidateRoot(doc: Document): HTMLElement {
-  const preferredSelectors = ['article', 'main', '[role="main"]', '[itemprop="articleBody"]'];
-  const candidates = preferredSelectors.flatMap((selector) =>
-    Array.from(doc.querySelectorAll(selector)).filter(
-      (element): element is HTMLElement => element instanceof HTMLElement,
-    ),
-  );
-
-  if (candidates.length === 0) {
-    console.log(DEBUG_PREFIX, 'No preferred candidate found, falling back to body');
-    return doc.body;
-  }
-
-  const scoredCandidates = candidates.map((candidate) => ({
-    element: candidate,
-    score: scoreCandidate(candidate),
-  }));
-  console.log(DEBUG_PREFIX, 'Candidate scores', scoredCandidates.map(({ element, score }) => ({
-    score,
-    tagName: element.tagName,
-    id: element.id,
-    className: element.className,
-  })));
-
-  return scoredCandidates.reduce((best, candidate) => (candidate.score > best.score ? candidate : best)).element;
-}
-
-function scoreCandidate(element: HTMLElement): number {
-  const textLength = getTextLength(element);
-  const linkLength = Array.from(element.querySelectorAll('a')).reduce(
-    (total, link) => total + getTextLength(link),
-    0,
-  );
-  const paragraphCount = element.querySelectorAll('p').length;
-  const headingCount = element.querySelectorAll('h1, h2, h3').length;
-
-  return textLength + paragraphCount * 120 + headingCount * 40 - linkLength * 0.5;
-}
-
-function getTextLength(element: Element): number {
-  return normalizeWhitespace(element.textContent ?? '').length;
-}
-
-function pruneNoise(root: ParentNode) {
-  console.log(DEBUG_PREFIX, 'Pruning obvious noise nodes');
-  root.querySelectorAll(NOISE_SELECTORS).forEach((element) => element.remove());
-
-  root.querySelectorAll('*').forEach((element) => {
-    if (!(element instanceof HTMLElement)) {
-      return;
-    }
-
-    if (isNoiseElement(element)) {
-      console.log(DEBUG_PREFIX, 'Removing noisy element', describeElement(element));
-      element.remove();
-    }
-  });
-}
-
-function isNoiseElement(element: HTMLElement): boolean {
-  const tokens = [
-    element.id,
-    element.className,
-    element.getAttribute('role'),
-    element.getAttribute('aria-label'),
-    element.getAttribute('data-testid'),
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-
-  if (!tokens) {
-    return false;
-  }
-
-  return NOISE_KEYWORDS.some((keyword) => tokens.includes(keyword));
-}
-
-function getReadableText(element: HTMLElement): string {
-  const text = element.innerText || element.textContent || '';
-  console.log(DEBUG_PREFIX, 'Collected readable text', {
-    length: text.length,
-    preview: text.slice(0, 500),
-  });
-  return text;
-}
-
-function normalizeText(text: string): string {
-  return text
-    .replace(/\r\n/g, '\n')
-    .replace(/\u00a0/g, ' ')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim();
-}
-
-function normalizeWhitespace(text: string): string {
-  return text.replace(/\s+/g, ' ').trim();
-}
-
-function getSiteName(doc: Document): string {
-  const candidates = [
-    'meta[property="og:site_name"]',
-    'meta[name="application-name"]',
-    'meta[name="apple-mobile-web-app-title"]',
-    'meta[name="publisher"]',
-  ];
-
-  for (const selector of candidates) {
-    const content = doc.querySelector(selector)?.getAttribute('content')?.trim();
-    if (content) {
-      return content;
-    }
-  }
-
-  const hostname = location.hostname.replace(/^www\./, '').trim();
-  return hostname || doc.title.trim() || 'Unknown site';
-}
-
-function describeElement(element: Element): Record<string, string | number | undefined> {
-  return {
-    tagName: element.tagName,
-    id: element.id || undefined,
-    className:
-      element instanceof HTMLElement && typeof element.className === 'string' && element.className.length > 0
-        ? element.className
-        : undefined,
-    childCount: element.children.length,
-    textLength: normalizeWhitespace(element.textContent ?? '').length,
-  };
-}
