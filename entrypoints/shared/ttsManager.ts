@@ -2715,51 +2715,19 @@ class TTSManager {
     const icon = document.createElement('div');
       if (!icon) {
         return null;
-      }
+    }
 
     icon.id = 'tts-take-hover-icon';
-    const highlightColor = this.getHighlightColor();
+    const speakerIconUrl = chrome.runtime.getURL('speaker.svg');
     icon.innerHTML = `
-      <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 152 152" xmlns="http://www.w3.org/2000/svg">
-        <style>
-          .tts-icon-blue { fill: ${highlightColor}; }
-          .tts-icon-white { fill: #fff; }
-          
-          .tts-icon-element {
-            opacity: 0;
-          }
-          
-          .tts-icon-animate .tts-icon-element-1 { 
-            animation: ttsIconShow 0.1s ease 0.1s forwards; 
-          }
-          .tts-icon-animate .tts-icon-element-2 { 
-            animation: ttsIconShow 0.1s ease 0.15s forwards; 
-          }
-          .tts-icon-animate .tts-icon-element-3 { 
-            animation: ttsIconShow 0.1s ease 0.20s forwards; 
-          }
-          .tts-icon-animate .tts-icon-element-4 { 
-            animation: ttsIconShow 0.1s ease 0.25s forwards; 
-          }
-          
-          @keyframes ttsIconShow {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-        </style>
-        <g>
-          <circle class="tts-icon-white" cx="76" cy="76" r="72"/>
-          <path class="tts-icon-blue" d="M76,152C34.1,152,0,117.9,0,76S34.1,0,76,0s76,34.1,76,76-34.1,76-76,76ZM76,8C38.5,8,8,38.5,8,76s30.5,68,68,68,68-30.5,68-68S113.5,8,76,8Z"/>
-        </g>
-        <!-- 1. Left small circle -->
-        <circle class="tts-icon-blue tts-icon-element tts-icon-element-1" cx="51.3" cy="76" r="10.8"/>
-        <!-- 2-1. Upper diagonal line -->
-        <rect class="tts-icon-blue tts-icon-element tts-icon-element-2" x="77" y="41.2" width="23.3" height="8" transform="translate(-8.5 66.6) rotate(-39.4)"/>
-        <!-- 2-2. Center horizontal line -->
-        <rect class="tts-icon-blue tts-icon-element tts-icon-element-3" x="83" y="72" width="22.8" height="8"/>
-        <!-- 2-3. Lower diagonal line -->
-        <rect class="tts-icon-blue tts-icon-element tts-icon-element-4" x="84.7" y="95.1" width="8" height="23.3" transform="translate(-50.1 107.5) rotate(-50.6)"/>
-      </svg>
+      <img
+        src="${speakerIconUrl}"
+        alt=""
+        aria-hidden="true"
+        width="${iconSize}"
+        height="${iconSize}"
+        style="display:block; width:${iconSize}px; height:${iconSize}px; object-fit:contain; border-radius:50%;"
+      />
     `;
     return icon;
     } catch (error) {
