@@ -61,11 +61,11 @@ export function createPlayerDock(manager: PlayerDockManager) {
     left: auto !important;
     bottom: auto !important;
     transform: translateY(-50%) !important;
-    width: 124px !important;
-    min-width: 124px !important;
-    max-width: 124px !important;
+    width: 75px !important;
+    min-width: 75px !important;
+    max-width: 75px !important;
     z-index: 2147483637 !important;
-    padding: 10px 8px !important;
+    padding: 8px 6px !important;
     margin: 0 !important;
     background: ${bgColor} !important;
     backdrop-filter: blur(10px) !important;
@@ -96,8 +96,8 @@ export function createPlayerDock(manager: PlayerDockManager) {
   headerRow.style.cssText = `
     display: flex !important;
     align-items: center !important;
-    justify-content: space-between !important;
-    gap: 10px !important;
+    justify-content: center !important;
+    gap: 0 !important;
     width: 100% !important;
     box-sizing: border-box !important;
   `;
@@ -117,6 +117,7 @@ export function createPlayerDock(manager: PlayerDockManager) {
     justify-content: center !important;
     cursor: default !important;
     flex-shrink: 0 !important;
+    align-self: center !important;
   `;
 
   const logo = document.createElement('img');
@@ -130,7 +131,7 @@ export function createPlayerDock(manager: PlayerDockManager) {
     width: 24px !important;
     height: 24px !important;
     object-fit: contain !important;
-    border-radius: 6px !important;
+    border-radius: 8px !important;
   `;
   logoWrap.appendChild(logo);
 
@@ -147,7 +148,7 @@ export function createPlayerDock(manager: PlayerDockManager) {
     font-family: inherit !important;
     cursor: pointer !important;
     outline: none !important;
-    padding: 0 8px !important;
+    padding: 0 4px !important;
     box-sizing: border-box !important;
   `;
 
@@ -164,7 +165,7 @@ export function createPlayerDock(manager: PlayerDockManager) {
     font-family: inherit !important;
     cursor: pointer !important;
     outline: none !important;
-    padding: 0 8px !important;
+    padding: 0 4px !important;
     box-sizing: border-box !important;
   `;
 
@@ -304,8 +305,8 @@ export function populatePlayerDockVoiceSelect(manager: PlayerDockManager) {
   manager.VOICES.forEach((voice) => {
     const option = document.createElement('option');
     option.value = voice.id;
-    option.textContent = voice.name;
-    option.title = voice.description || '';
+    option.textContent = truncateVoiceLabel(voice.name);
+    option.title = voice.description ? `${voice.name} - ${voice.description}` : voice.name;
     manager.voiceSelect?.appendChild(option);
   });
 
@@ -332,6 +333,14 @@ export function populatePlayerDockSpeedSelect(manager: PlayerDockManager) {
 function getSpeedSelectValue(speed: number) {
   const candidate = Math.round(speed * 10) / 10;
   return candidate.toFixed(1);
+}
+
+function truncateVoiceLabel(label: string, maxLength = 7) {
+  if (label.length <= maxLength) {
+    return label;
+  }
+
+  return `${label.slice(0, maxLength)}...`;
 }
 
 export function updatePlayerDockState(manager: PlayerDockManager) {
