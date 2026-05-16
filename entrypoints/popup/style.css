@@ -75,6 +75,10 @@ p {
   background: #ffffff;
 }
 
+#native-actions-section[hidden] {
+  display: none !important;
+}
+
 .switch-row {
   display: flex;
   align-items: center;
