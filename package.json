@@ -13,6 +13,7 @@
     "zip": "yarn assets:build && wxt zip",
     "zip:firefox": "yarn assets:build && wxt zip -b firefox",
     "compile": "yarn assets:build && tsc --noEmit",
+    "test": "node scripts/run-tests.mjs",
     "postinstall": "wxt prepare"
   },
   "dependencies": {
