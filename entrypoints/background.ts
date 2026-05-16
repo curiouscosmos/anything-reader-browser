@@ -1,303 +1,374 @@
-const READ_CURRENT_PAGE_MESSAGE = 'anything-reader:read-current-page';
-const EXTRACT_READABLE_TEXT_MESSAGE = 'anything-reader:extract-readable-text';
-const NATIVE_HOST_NAME = 'com.anythingreader.mac';
-const MAX_TEXT_LENGTH = 500_000;
-const DEBUG_PREFIX = '[Anything Reader][Background]';
-
-type ExtractResult =
-  | {
-      ok: true;
-      title: string;
-      site: string;
-      url: string;
-      text: string;
-      textLength: number;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
-
-type ReadResult =
-  | {
-      ok: true;
-      textLength: number;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
-
-type NativePayload = {
-  title: string;
-  site: string;
-  url: string;
-  text: string;
-  textLength: number;
-  summarize?: true;
-};
-
-type ReadCurrentPageRequest = {
-  type: typeof READ_CURRENT_PAGE_MESSAGE;
-  summarize?: boolean;
-};
+import type { TtsAction } from '@/lib/tts-engine.ts';
 
 export default defineBackground(() => {
-  const manifest = browser.runtime.getManifest() as {
-    key?: string;
-    name?: string;
-    version?: string;
-    browser_specific_settings?: unknown;
-    allowed_origins?: unknown;
-    allowed_extensions?: unknown;
-  };
-
-  console.log(DEBUG_PREFIX, 'Runtime info', {
-    id: browser.runtime.id,
-    origin: browser.runtime.getURL(''),
-    browser: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
-  });
-
-  console.log(DEBUG_PREFIX, 'Manifest info', {
-    name: manifest.name,
-    version: manifest.version,
-    key: manifest.key ?? '<not present>',
-    browser_specific_settings: manifest.browser_specific_settings ?? '<not present>',
-    allowed_origins: manifest.allowed_origins ?? '<not present>',
-    allowed_extensions: manifest.allowed_extensions ?? '<not present>',
-  });
-
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (!isReadCurrentPageRequest(message)) {
+    if (isTtsMessage(message)) {
+      void sendTtsMessage(message.action, message.data)
+        .then(sendResponse)
+        .catch((error) => {
+          console.error('[Anything Reader][Background] TTS request failed', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+
+      return true;
+    }
+
+    if (!isDemoMessage(message)) {
       return;
     }
 
-    console.log(DEBUG_PREFIX, 'Received read request from popup', message);
-    void readCurrentPageAndSendToMac(message.summarize === true)
-      .then((result) => {
-        console.log(DEBUG_PREFIX, 'Sending read result back to popup', result);
-        sendResponse(result);
-      })
+    void handleDemoMessage(message, _sender)
+      .then(sendResponse)
       .catch((error) => {
-        const result = {
-          ok: false as const,
-          error: formatError(error),
-        };
-        console.error(DEBUG_PREFIX, 'Failed before response could be sent', error);
-        sendResponse(result);
+        console.error('[Anything Reader][Background] Demo request failed', error);
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
       });
 
-    // Keep the message channel open while the async work completes.
     return true;
+  });
+
+  browser.runtime.onInstalled.addListener(() => {
+    void updateExtensionIcon(true);
+    void createContextMenu();
+    void cleanupOldReaderContent();
+    void preloadTtsModel();
+  });
+
+  browser.runtime.onStartup.addListener(() => {
+    void updateExtensionIcon(true);
+    void cleanupOldReaderContent();
+    void preloadTtsModel();
+  });
+
+  const chromeApi = getChromeApi();
+  chromeApi.action?.onClicked?.addListener((tab) => {
+    if (!tab.id) {
+      return;
+    }
+
+    void browser.tabs
+      .sendMessage(tab.id, {
+        action: 'toggle',
+        iconPosition: 'top-right',
+      })
+      .then((response) => {
+        const enabled = (response as { enabled?: unknown } | undefined)?.enabled;
+        if (typeof enabled === 'boolean') {
+          void updateExtensionIcon(enabled);
+        }
+      })
+      .catch(() => {});
+  });
+
+  chromeApi.contextMenus?.onClicked?.addListener((info, tab) => {
+    if (info.menuItemId !== CONTEXT_MENU_ID || !info.selectionText || !tab?.id) {
+      return;
+    }
+
+    void browser.tabs.sendMessage(tab.id, {
+      action: 'playSelectedText',
+      text: info.selectionText,
+    });
+  });
+
+  browser.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'sync' && changes['ar-plugin-enabled']?.newValue === true) {
+      void preloadTtsModel();
+    }
   });
 });
 
-function isReadCurrentPageRequest(message: unknown): message is ReadCurrentPageRequest {
-  return (
-    typeof message === 'object' &&
-    message !== null &&
-    'type' in message &&
-    (message as { type?: unknown }).type === READ_CURRENT_PAGE_MESSAGE
-  );
+type TtsMessage = {
+  action: TtsAction;
+  data?: unknown;
+};
+
+type DemoMessage = {
+  action: 'getSelectedText' | 'speak' | 'updateIcon' | 'openReaderPage';
+  enabled?: boolean;
+  texts?: string[];
+};
+
+const OFFSCREEN_DOCUMENT_PATH = 'offscreen.html';
+const CONTEXT_MENU_ID = 'read-with-anything-reader';
+const READER_CONTENT_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+
+let creatingOffscreenDocument: Promise<void> | null = null;
+let backgroundTtsEngine: Promise<BackgroundTtsEngine> | null = null;
+
+type BackgroundTtsEngine = {
+  handle: (action: TtsAction, data?: unknown) => Promise<unknown>;
+  ensureInitialized: () => Promise<void>;
+};
+
+type ChromeOffscreenApi = {
+  createDocument: (options: { url: string; reasons: string[]; justification: string }) => Promise<void>;
+};
+
+type ChromeRuntimeApi = {
+  getURL: (path: string) => string;
+  getContexts?: (query: { contextTypes: string[]; documentUrls: string[] }) => Promise<unknown[]>;
+};
+
+type ChromeActionApi = {
+  setIcon?: (details: { path: Record<number, string> }) => Promise<void>;
+  onClicked?: {
+    addListener: (callback: (tab: { id?: number }) => void) => void;
+  };
+};
+
+type ChromeContextMenusApi = {
+  create?: (details: { id: string; title: string; contexts: string[] }) => void;
+  removeAll?: (callback?: () => void) => void;
+  onClicked?: {
+    addListener: (callback: (info: { menuItemId?: string; selectionText?: string }, tab?: { id?: number }) => void) => void;
+  };
+};
+
+type ChromeApi = {
+  offscreen?: ChromeOffscreenApi;
+  runtime?: ChromeRuntimeApi;
+  action?: ChromeActionApi;
+  contextMenus?: ChromeContextMenusApi;
+};
+
+function isTtsMessage(message: unknown): message is TtsMessage {
+  if (!message || typeof message !== 'object' || !('action' in message)) {
+    return false;
+  }
+
+  if ((message as { target?: unknown }).target === 'offscreen') {
+    return false;
+  }
+
+  const action = (message as { action?: unknown }).action;
+  return action === 'tts-initialize' || action === 'tts-generate' || action === 'tts-unload' || action === 'tts-status';
 }
 
-async function readCurrentPageAndSendToMac(summarize: boolean): Promise<ReadResult> {
-  try {
-    const tab = await getActiveTab();
-    console.log(DEBUG_PREFIX, 'Active tab lookup result', tab);
+function isDemoMessage(message: unknown): message is DemoMessage {
+  if (!message || typeof message !== 'object' || !('action' in message)) {
+    return false;
+  }
 
-    if (!tab?.id) {
-      console.error(DEBUG_PREFIX, 'No active tab was found');
-      return {
-        ok: false,
-        error: 'No active tab was found.',
-      };
+  const action = (message as { action?: unknown }).action;
+  return action === 'getSelectedText' || action === 'speak' || action === 'updateIcon' || action === 'openReaderPage';
+}
+
+async function handleDemoMessage(message: DemoMessage, sender: { tab?: { id?: number } }) {
+  switch (message.action) {
+    case 'getSelectedText': {
+      if (!sender.tab?.id) {
+        return {};
+      }
+
+      return browser.tabs.sendMessage(sender.tab.id, { action: 'getSelectedText' });
     }
-
-    let extracted: ExtractResult | undefined;
-
-    try {
-      console.log(DEBUG_PREFIX, 'Requesting readable text from content script', {
-        tabId: tab.id,
-        messageType: EXTRACT_READABLE_TEXT_MESSAGE,
-      });
-      extracted = (await browser.tabs.sendMessage(tab.id, {
-        type: EXTRACT_READABLE_TEXT_MESSAGE,
-      })) as ExtractResult | undefined;
-      console.log(DEBUG_PREFIX, 'Content script response', extracted);
-    } catch (error) {
-      console.error(DEBUG_PREFIX, 'Content script request failed', error);
-      return {
-        ok: false,
-        error: describeTabMessageError(error),
-      };
-    }
-
-    if (!extracted || !extracted.ok) {
-      console.error(DEBUG_PREFIX, 'Readable text extraction failed', extracted);
-      return {
-        ok: false,
-        error: extracted?.error ?? 'Could not extract readable text from the active page.',
-      };
-    }
-
-    const text = clampText(normalizeText(extracted.text));
-    console.log(DEBUG_PREFIX, 'Normalized extracted text', {
-      title: extracted.title,
-      site: extracted.site,
-      url: extracted.url,
-      textLength: text.length,
-      preview: text.slice(0, 500),
-    });
-
-    if (!text) {
-      console.error(DEBUG_PREFIX, 'Normalized text was empty after cleanup');
-      return {
-        ok: false,
-        error: 'No readable text was found on the active page.',
-      };
-    }
-
-    console.log(DEBUG_PREFIX, 'Sending payload to native host', {
-      host: NATIVE_HOST_NAME,
-      title: extracted.title,
-      site: extracted.site,
-      url: extracted.url,
-      textLength: text.length,
-      summarize,
-      preview: text.slice(0, 500),
-    });
-    const payload: NativePayload = {
-      title: extracted.title,
-      site: extracted.site,
-      url: extracted.url,
-      text,
-      textLength: text.length,
-      ...(summarize ? { summarize: true as const } : {}),
-    };
-    await sendTextToNativeApp(payload);
-    console.log(DEBUG_PREFIX, 'Native host accepted payload');
-
-    return {
-      ok: true,
-      textLength: text.length,
-    };
-  } catch (error) {
-    console.error(DEBUG_PREFIX, 'Unexpected read flow failure', error);
-    return {
-      ok: false,
-      error: formatError(error),
-    };
+    case 'speak':
+      return { success: true };
+    case 'updateIcon':
+      await updateExtensionIcon(message.enabled !== false);
+      return { success: true };
+    case 'openReaderPage':
+      return openReaderPage(message.texts ?? []);
   }
 }
 
-async function getActiveTab() {
-  const [tab] = await browser.tabs.query({
-    active: true,
-    currentWindow: true,
+async function sendToOffscreen(action: TtsAction, data?: unknown) {
+  await ensureOffscreenDocument();
+
+  return browser.runtime.sendMessage({
+    target: 'offscreen',
+    action,
+    data,
+  });
+}
+
+async function sendTtsMessage(action: TtsAction, data?: unknown) {
+  if (canUseChromeOffscreen()) {
+    return sendToOffscreen(action, data);
+  }
+
+  const engine = await getBackgroundTtsEngine();
+  return engine.handle(action, data ?? {});
+}
+
+async function getBackgroundTtsEngine() {
+  if (!backgroundTtsEngine) {
+    backgroundTtsEngine = import('@/lib/tts-engine.ts').then(({ createSupertonicTtsEngine }) =>
+      createSupertonicTtsEngine({
+        debugPrefix: '[Anything Reader][BackgroundTTS]',
+        modelRoot: browser.runtime.getURL('onnx' as never),
+        voiceStyleRoot: browser.runtime.getURL('voice_styles' as never),
+        kittenRoot: browser.runtime.getURL('kittenTTS' as never),
+        ortWasmRoot: browser.runtime.getURL('ort/' as never),
+        primaryExecutionProviders: ['wasm'],
+        fallbackExecutionProviders: ['wasm'],
+      }),
+    );
+  }
+
+  return backgroundTtsEngine;
+}
+
+async function preloadTtsModel() {
+  try {
+    const settings = await browser.storage.sync.get(['ar-tts-model']);
+    const model = settings['ar-tts-model'] === 'supertonic' ? 'supertonic' : 'kitten';
+    await sendTtsMessage('tts-initialize', { model });
+  } catch (error) {
+    console.warn('[Anything Reader][Background] TTS preload failed', error);
+  }
+}
+
+async function createContextMenu() {
+  const contextMenus = getChromeApi().contextMenus;
+  if (!contextMenus?.create) {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    contextMenus.removeAll?.(() => {
+      contextMenus.create?.({
+        id: CONTEXT_MENU_ID,
+        title: 'Read with Anything Reader',
+        contexts: ['selection'],
+      });
+      resolve();
+    });
+
+    if (!contextMenus.removeAll) {
+      contextMenus.create?.({
+        id: CONTEXT_MENU_ID,
+        title: 'Read with Anything Reader',
+        contexts: ['selection'],
+      });
+      resolve();
+    }
+  });
+}
+
+async function openReaderPage(texts: string[]) {
+  const pageId = Date.now().toString();
+  const storageKey = `readerContent_${pageId}`;
+  const now = Date.now();
+
+  await browser.storage.local.set({
+    [storageKey]: {
+      texts,
+      created: now,
+      lastAccessed: now,
+      title: texts[0]?.slice(0, 100) || 'Untitled',
+    },
   });
 
-  return tab;
+  const tab = await browser.tabs.create({
+    url: browser.runtime.getURL(`reader.html?id=${pageId}` as never),
+  });
+
+  return {
+    success: true,
+    tabId: tab.id,
+    pageId,
+  };
 }
 
-async function sendTextToNativeApp(payload: NativePayload) {
-  try {
-    // Native host contract:
-    // - `type` identifies the browser-to-host message.
-    // - `payload` contains page metadata and text.
-    // - `payload.summarize === true` tells the host to summarize instead of
-    //   performing the default read handoff.
-    // Failure states are reported back as a rejected native message call or a
-    // host response with `{ ok: false, error: string }`.
-    const response = await browser.runtime.sendNativeMessage(NATIVE_HOST_NAME, {
-      type: 'anything-reader:page-text',
-      payload,
+async function cleanupOldReaderContent() {
+  const now = Date.now();
+  const items = await browser.storage.local.get(null);
+  const keysToRemove = Object.entries(items)
+    .filter(([key, value]) => {
+      if (!key.startsWith('readerContent_') || !value || typeof value !== 'object') {
+        return false;
+      }
+
+      const lastAccessed = (value as { lastAccessed?: unknown }).lastAccessed;
+      return typeof lastAccessed === 'number' && now - lastAccessed > READER_CONTENT_MAX_AGE;
+    })
+    .map(([key]) => key);
+
+  if (keysToRemove.length > 0) {
+    await browser.storage.local.remove(keysToRemove);
+  }
+}
+
+async function ensureOffscreenDocument() {
+  const chromeApi = getChromeApi();
+  const offscreenApi = chromeApi.offscreen;
+  const runtimeApi = chromeApi.runtime;
+  if (!offscreenApi) {
+    throw new Error('Chrome offscreen documents are unavailable in this browser.');
+  }
+
+  if (!runtimeApi) {
+    throw new Error('Chrome runtime APIs are unavailable.');
+  }
+
+  const offscreenUrl = runtimeApi.getURL(OFFSCREEN_DOCUMENT_PATH);
+  if (runtimeApi.getContexts) {
+    const contexts = await runtimeApi.getContexts({
+      contextTypes: ['OFFSCREEN_DOCUMENT'],
+      documentUrls: [offscreenUrl],
     });
-    console.log(DEBUG_PREFIX, 'Native host response', response);
 
-    if (response && typeof response === 'object' && 'ok' in response && (response as { ok?: unknown }).ok === false) {
-      const error = (response as { error?: unknown }).error;
-      throw new Error(typeof error === 'string' && error.length > 0 ? error : 'The local Mac app rejected the text.');
-    }
-  } catch (error) {
-    console.error(DEBUG_PREFIX, 'Native host request failed', error);
-    throw new Error(resolveNativeHostError(error));
-  }
-}
-
-function clampText(text: string): string {
-  if (text.length <= MAX_TEXT_LENGTH) {
-    return text;
-  }
-
-  return text.slice(0, MAX_TEXT_LENGTH);
-}
-
-function normalizeText(text: string): string {
-  return text
-    .replace(/\r\n/g, '\n')
-    .replace(/\u00a0/g, ' ')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim();
-}
-
-function formatError(error: unknown): string {
-  console.error(DEBUG_PREFIX, 'Formatting error', error);
-  if (typeof error === 'string') {
-    return error;
-  }
-
-  if (error instanceof Error) {
-    return error.message || error.name;
-  }
-
-  if (typeof error === 'object' && error !== null) {
-    const maybeMessage = (error as { message?: unknown }).message;
-
-    if (typeof maybeMessage === 'string' && maybeMessage.length > 0) {
-      return maybeMessage;
+    if (contexts.length > 0) {
+      return;
     }
   }
 
-  return 'An unexpected error occurred.';
-}
-
-function resolveNativeHostError(error: unknown): string {
-  const message = formatError(error);
-  console.log(DEBUG_PREFIX, 'Resolving native host error message', message);
-
-  if (
-    message.includes('Native host has exited') ||
-    message.includes('Could not establish connection') ||
-    message.includes('native application host could not be found') ||
-    message.includes('native host could not be found') ||
-    message.includes('native application host was not found') ||
-    message.includes('No such native application') ||
-    message.includes('No such native host') ||
-    message.includes('The native messaging host') ||
-    message.includes('Receiving end does not exist')
-  ) {
-    return 'Anything Reader Mac app was not reachable. Make sure the macOS app is installed and its native messaging host is registered.';
+  if (!creatingOffscreenDocument) {
+    creatingOffscreenDocument = offscreenApi
+      .createDocument({
+        url: OFFSCREEN_DOCUMENT_PATH,
+        reasons: ['WORKERS', 'BLOBS'],
+        justification: 'Run local Supertonic ONNX TTS inference in one shared extension context.',
+      })
+      .finally(() => {
+        creatingOffscreenDocument = null;
+      });
   }
 
-  return message;
+  await creatingOffscreenDocument;
 }
 
-function describeTabMessageError(error: unknown): string {
-  const message = formatError(error);
-  console.log(DEBUG_PREFIX, 'Resolving tab message error message', message);
+function canUseChromeOffscreen() {
+  const chromeApi = getChromeApi();
+  return Boolean(chromeApi.offscreen?.createDocument && chromeApi.runtime?.getURL);
+}
 
-  if (
-    message.includes('Receiving end does not exist') ||
-    message.includes('Could not establish connection') ||
-    message.includes('No matching message handler')
-  ) {
-    return 'The active tab did not expose readable content to the extension. Refresh the page and try again.';
+async function updateExtensionIcon(isEnabled: boolean) {
+  const actionApi = getChromeApi().action;
+  if (!actionApi?.setIcon) {
+    return;
   }
 
-  return message;
+  const suffix = isEnabled ? 'on' : 'off';
+  await actionApi.setIcon({
+    path: {
+      16: `icon16_${suffix}.png`,
+      32: `icon32_${suffix}.png`,
+      48: `icon48_${suffix}.png`,
+      128: `icon128_${suffix}.png`,
+    },
+  });
 }
 
-export {};
+function getChromeApi() {
+  const globalChrome = (globalThis as typeof globalThis & { chrome?: ChromeApi }).chrome;
+  if (globalChrome) {
+    return globalChrome;
+  }
+
+  const browserAsChrome = browser as typeof browser & ChromeApi;
+  return {
+    offscreen: browserAsChrome.offscreen,
+    runtime: browserAsChrome.runtime as unknown as ChromeRuntimeApi,
+    action: browserAsChrome.action as unknown as ChromeActionApi,
+    contextMenus: browserAsChrome.contextMenus as unknown as ChromeContextMenusApi,
+  };
+}

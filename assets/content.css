@@ -1,0 +1,109 @@
+.tts-selected {
+  position: relative;
+  z-index: 10000;
+}
+
+.tts-selected::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  background-color: rgba(0, 123, 255, 0.1);
+  pointer-events: none;
+  z-index: -1;
+  border-radius: 5px;
+}
+
+.tts-word {
+  position: relative;
+  display: inline;
+  transition: all 0.3s ease;
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+
+.tts-word.tts-current-word {
+  background-color: rgba(255, 193, 7, 0.8) !important;
+  color: #000 !important;
+  font-weight: bold !important;
+  box-shadow: 0 2px 4px rgba(255, 193, 7, 0.4);
+  transform: scale(1.05);
+  z-index: 10001;
+}
+
+.tts-current-take {
+  background-color: rgba(0, 123, 255, 0.1) !important;
+}
+
+.tts-current-word-appjs {
+  text-decoration: underline !important;
+  text-underline-position: under !important;
+  text-decoration-color: #227cff !important;
+  text-underline-offset: 5% !important;
+  transition: all 0.3s ease !important;
+  padding: 0 !important;
+  margin-right: auto !important;
+  border-radius: 2px !important;
+}
+
+@keyframes tts-buffering {
+  0% { opacity: 1; }
+  50% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+#tts-floating-ui {
+  position: fixed !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  width: 350px !important;
+  max-height: 500px !important;
+  background: rgba(0, 0, 0, 0.9) !important;
+  color: white !important;
+  padding: 15px !important;
+  border-radius: 10px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 12px !important;
+  z-index: 99999 !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  overflow-y: auto !important;
+}
+
+#tts-floating-ui * {
+  box-sizing: border-box !important;
+}
+
+#tts-html-viewer {
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 10px;
+  line-height: 1.4;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#tts-html-viewer .html-tag {
+  color: #7dd3fc;
+}
+
+#tts-html-viewer .html-attr {
+  color: #fbbf24;
+}
+
+#tts-html-viewer .html-text {
+  color: #a7f3d0;
+}
+
+#tts-html-viewer .html-current {
+  background-color: rgba(255, 193, 7, 0.3);
+  padding: 2px 4px;
+  border-radius: 2px;
+}

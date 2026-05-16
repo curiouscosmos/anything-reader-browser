@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anything Reader.html</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Open+Sans:wght@400;600;700&family=Lato:wght@400;700&family=Noto+Sans+KR:wght@400;600;700&family=IBM+Plex+Sans+KR:wght@400;600;700&family=Merriweather:wght@400;700&family=Libre+Baskerville:wght@400;700&family=Playfair+Display:wght@400;700&family=Noto+Serif+KR:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&family=Source+Code+Pro:wght@400;600&family=Nanum+Pen+Script&family=Song+Myung&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="content.css">
+  <style>
+    body {
+      background: #dcdcdc;
+      color: #000000;
+      line-height: 1.6;
+      padding: 60px;
+      margin: 0;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    p {
+      margin: 0 0 1em 0;
+    }
+    #content {
+      max-width: 100%;
+      transition: font-size 0.3s, max-width 0.3s, line-height 0.3s, font-family 0.3s;
+    }
+
+    #typography-floating-ui {
+      position: fixed;
+      right: 1.5%;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 2100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 22px;
+      color: rgba(140, 140, 140, 0.5);
+      user-select: none;
+    }
+    .typography-icon-button {
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border-radius: 50%;
+      transition: background-color 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .typography-icon-button:active {
+      background-color: rgba(139, 69, 19, 0.1);
+    }
+    .font-name-popup {
+      position: absolute;
+      left: 50%;
+      top: calc(120% + 5px);
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: inherit;
+      opacity: 0.5;
+      font-size: 15px;
+      animation: fadeInOut 3s forwards;
+    }
+    @keyframes fadeInOut {
+      0% { opacity: 0; }
+      5% { opacity: 0.3; }
+      80% { opacity: 0.3; }
+      100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="content"></div>
+  
+  <div id="typography-floating-ui">
+    <div class="typography-icon-button" id="btn-scroll-top" title="Scroll to top">
+      <span>^</span>
+    </div>
+    <div class="typography-icon-button" id="btn-scroll-to-reading" title="Scroll to current reading position">
+      <span>~</span>
+    </div>
+    <div class="typography-icon-button" id="btn-font-size-up" title="Increase font size">
+      <span style="font-size: 90%;">+</span>
+    </div>
+    <div class="typography-icon-button" id="btn-font-size-down" title="Decrease font size">
+      <span style="font-size: 90%;">-</span>
+    </div>
+    <div class="typography-icon-button" id="btn-width-up" title="Increase width">
+      <span style="font-size: 90%;">&gt;</span>
+    </div>
+    <div class="typography-icon-button" id="btn-width-down" title="Decrease width">
+      <span style="font-size: 90%;">&lt;</span>
+    </div>
+    <div class="typography-icon-button" id="btn-line-height-up" title="Increase line height">
+      <span style="font-size: 80%;">∧</span>
+    </div>
+    <div class="typography-icon-button" id="btn-line-height-down" title="Decrease line height">
+      <span style="font-size: 80%;">∨</span>
+    </div>
+    <div class="typography-icon-button" id="btn-toggle-dark" title="Toggle dark mode">
+      <span style="font-size: 80%;">●</span>
+    </div>
+    <div class="typography-icon-button" id="btn-font-family" style="position: relative;" title="Change font family">
+      <span style="font-size: 80%;">T</span>
+      <div id="font-name-popup" class="font-name-popup" style="display: none;"></div>
+    </div>
+  </div>
+
+  <!-- Reader initialization (MUST load first) -->
+  <script src="reader-init.js"></script>
+  <!-- Reader Script (set up message listener) -->
+  <script src="reader.js"></script>
+  <!-- Anything Reader Content Scripts (load after reader.js, ONNX runs in offscreen document) -->
+  <script src="html-analyzer-common.js"></script>
+  <script src="text-preprocessor.js"></script>
+  <script src="ttsManager.js"></script>
+</body>
+</html>

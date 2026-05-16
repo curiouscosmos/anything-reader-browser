@@ -9,10 +9,14 @@ lerna-debug.log*
 
 node_modules
 .output
+assets-built
 stats.html
 stats-*.json
 .wxt
 web-ext.config.ts
+example
+!example/
+!example/**
 
 # Editor directories and files
 .vscode/*
@@ -25,3 +29,9 @@ web-ext.config.ts
 *.sln
 *.sw?
 AGENTS.md
+AI.md
+assets/ort/
+public/ort/
+*.onnx
+assets/onnx
+assets/kittenTTS

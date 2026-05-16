@@ -3,11 +3,92 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Default Popup Title</title>
-    <meta name="manifest.type" content="browser_action" />
+    <meta name="manifest.default_icon" content='{"16":"icon16_on.png","32":"icon32_on.png","48":"icon48_on.png","128":"icon128_on.png"}' />
+    <title>Anything Reader</title>
+    <script type="module" src="./main.ts"></script>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="./main.tsx"></script>
+    <main class="popup-shell">
+      <header class="popup-header">
+        <img src="/icon128_on.png" alt="" class="popup-icon" />
+        <div>
+          <h1>Anything Reader</h1>
+          <p id="status-text">Ready</p>
+        </div>
+      </header>
+
+      <section class="control-group">
+        <label class="switch-row">
+          <span>
+            <strong>Reader icons</strong>
+            <small>Show speaker icons on readable text</small>
+          </span>
+          <input id="enabled-toggle" type="checkbox" />
+        </label>
+
+        <label class="switch-row">
+          <span>
+            <strong>Player bar</strong>
+            <small>Keep playback controls visible on pages</small>
+          </span>
+          <input id="bar-toggle" type="checkbox" />
+        </label>
+
+        <label class="switch-row">
+          <span>
+            <strong>Take list</strong>
+            <small>Show generated reading chunks</small>
+          </span>
+          <input id="take-list-toggle" type="checkbox" />
+        </label>
+
+        <label class="switch-row">
+          <span>
+            <strong>Auto Scroll</strong>
+            <small>Scroll the current paragraph into view</small>
+          </span>
+          <input id="auto-scroll-toggle" type="checkbox" />
+        </label>
+
+        <label class="switch-row">
+          <span>
+            <strong>Highlight text</strong>
+            <small>Highlight each word while reading</small>
+          </span>
+          <input id="highlight-toggle" type="checkbox" />
+        </label>
+      </section>
+
+      <section class="control-group">
+        <label class="field">
+          <span>TTS Model</span>
+          <select id="model-select">
+            <option value="kitten">KittenTTS</option>
+            <option value="supertonic">Supertonic</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Voice</span>
+          <select id="voice-select"></select>
+        </label>
+
+        <label class="field">
+          <span>Speed</span>
+          <select id="speed-select">
+            <option value="1.4">Fast</option>
+            <option value="1.2">A bit fast</option>
+            <option value="1">Normal</option>
+            <option value="0.9">A bit slow</option>
+          </select>
+        </label>
+
+        <div class="field">
+          <span>Highlight Color</span>
+          <div id="highlight-color-picker" class="color-picker" role="radiogroup" aria-label="Highlight Color"></div>
+        </div>
+      </section>
+
+    </main>
   </body>
 </html>

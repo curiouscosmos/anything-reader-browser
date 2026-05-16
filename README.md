@@ -1,37 +1,32 @@
 # Anything Reader Browser Extension
 
-Anything Reader is a browser extension that extracts readable text from the active page and sends it to the local Anything Reader Mac app.
+Anything Reader is a browser extension that places speaker buttons in front of readable page text and uses the Supertonic model to read the selected text out loud.
 
 ## Requirements
 
-- macOS only
-- Anything Reader Mac app installed
 - Chrome or Firefox
+- Supertonic ONNX assets available under `assets/onnx/`
+- Supertonic voice styles available under `assets/voice_styles/`
+- ONNX Runtime wasm files available under `assets/ort/`
 
-The Mac app is required for the extension to work. The browser extension does not render or store the full reading experience by itself; it hands the cleaned page text to the local Mac app.
+The `example/anything-reader-extension/` folder is the implementation blueprint the app follows.
 
 ## How It Works
 
 The extension is split into three parts:
 
-- `entrypoints/popup/` handles the popup UI.
-- `entrypoints/content.ts` runs in the page and extracts readable text.
-- `entrypoints/background.ts` coordinates the message flow and forwards the extracted text to the local Mac app through native messaging.
-
-The Mac app side is responsible for:
-
-- installing the native messaging host executable
-- installing the browser host manifest
-- receiving the text and forwarding it into the app UI or storage flow
+- `entrypoints/popup/` exposes page-reader controls.
+- `entrypoints/content.ts` injects speaker buttons, loads the Supertonic model, and handles playback/highlighting in the page.
+- `entrypoints/background.ts` stays empty because the runtime work happens in the page context.
 
 ## Repository Structure
 
 ```text
 entrypoints/
-  background.ts      Background script, messaging, native host bridge
-  content.ts         Readable-text extraction from the active page
+  background.ts      Empty background entrypoint
+  content.ts         Supertonic page reader and highlight logic
   popup/
-    App.tsx          Popup UI flow
+    App.tsx          Popup controls
     App.css          Popup styles
     style.css        Global popup styling
 
@@ -69,75 +64,26 @@ Typecheck the project:
 yarn compile
 ```
 
-## Installation Notes
-
-### Chrome
-
-Chrome needs two things:
-
-- the extension installed
-- a native messaging host manifest installed in Chrome’s NativeMessagingHosts directory
-
-For this project, the Chrome native host manifest must be available at:
-
-```text
-/Library/Google/Chrome/NativeMessagingHosts/com.anythingreader.mac.json
-```
-
-The manifest must point to the native host executable and whitelist the Chrome extension ID in `allowed_origins`.
-
-### Firefox
-
-Firefox uses its own native host manifest location:
-
-```text
-/Library/Application Support/Mozilla/NativeMessagingHosts/com.anythingreader.mac.json
-```
-
-Firefox uses `allowed_extensions` instead of Chrome’s `allowed_origins`.
-
-## Native Messaging Contract
-
-The browser extension sends the native host a JSON payload containing:
-
-- page title
-- site name
-- page URL
-- extracted text
-- text length
-- optional `summarize: true` flag when the user chooses the summarize action
-
-The host is expected to:
-
-- read the browser message from stdin
-- process or store the text
-- respond with JSON over stdout
-
 ## Current Behavior
 
 - The extension supports Chrome and Firefox.
-- The extension is configured for macOS only.
-- The Mac app must be installed for the browser extension to complete the handoff.
-- Readable-text extraction is conservative and intentionally strips common navigation and UI chrome.
+- Speaker buttons are injected in front of readable text blocks.
+- Clicking a speaker button loads Supertonic on demand, reads the block aloud, and highlights the active sentence.
+- Playback stops when the text ends or when the user stops it from the popup.
+- The example folder is the source of truth for the intended behavior.
 
 ## Troubleshooting
 
-If the button fails:
+If speaker buttons do not appear:
 
-- open the background/service worker console
-- confirm the popup logs show a request being sent
-- confirm the background logs show the content script response
-- confirm the native host manifest is installed in the correct browser directory
-- confirm the host executable path exists and is executable
-- confirm the Chrome extension ID matches `allowed_origins`
-
-If Chrome says `Specified native messaging host not found`, Chrome is not resolving the native host manifest or cannot launch the host executable.
-
-If the host runs but the app does not update, the problem is in the Mac app handoff after the host receives the payload.
+- confirm the Supertonic ONNX files exist under `assets/onnx/`
+- confirm the voice style JSON exists under `assets/voice_styles/`
+- confirm the ONNX Runtime wasm files exist under `assets/ort/`
+- open the content-script console and look for the Supertonic load error
+- refresh the page or use the popup's refresh action after changing the DOM
 
 ## Developer Notes
 
-- The Chrome extension ID is derived from the manifest key, so keep the Chrome manifest key stable if you need a fixed ID.
-- Keep native messaging host names stable. This project uses `com.anythingreader.mac`.
-- Do not treat the host manifest as app data. It is an install-time browser integration file.
-- The file-based inbox used by the host is an implementation detail of the Mac app side and can be replaced later with a direct IPC bridge.
+- Supertonic model loading is copied from the example folder and kept in `lib/supertonic.ts`.
+- Keep the content-script reader conservative: prefer fewer speaker buttons over noisy ones.
+- The page reader should keep sentence highlights and playback in sync, and should clean up after stop or completion.
