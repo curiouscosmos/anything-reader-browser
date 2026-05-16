@@ -2,28 +2,34 @@ import { build } from 'esbuild';
 import { cp, mkdir, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 
-const assetsDir = path.resolve('assets');
+const sourceDirs = [
+  path.resolve('assets'),
+  path.resolve('entrypoints/shared'),
+];
 const publicAssetsDir = path.resolve('assets-built');
-const files = await readdir(assetsDir);
 
 await rm(publicAssetsDir, { recursive: true, force: true });
 await mkdir(publicAssetsDir, { recursive: true });
 
-await Promise.all(
-  files.map(async (file) => {
+const tasks = [];
+
+for (const sourceDir of sourceDirs) {
+  const files = await readdir(sourceDir);
+
+  for (const file of files) {
     if (file === '.DS_Store' || file.endsWith('.js')) {
-      return;
+      continue;
     }
 
-    const source = path.join(assetsDir, file);
+    const source = path.join(sourceDir, file);
 
     if (!file.endsWith('.ts')) {
-      await cp(source, path.join(publicAssetsDir, file), { recursive: true });
-      return;
+      tasks.push(cp(source, path.join(publicAssetsDir, file), { recursive: true }));
+      continue;
     }
 
     const parsed = path.parse(file);
-    return build({
+    tasks.push(build({
       entryPoints: [source],
       outfile: path.join(publicAssetsDir, `${parsed.name}.js`),
       bundle: false,
@@ -33,6 +39,8 @@ await Promise.all(
       legalComments: 'none',
       logLevel: 'silent',
       sourcemap: false,
-    });
-  }),
-);
+    }));
+  }
+}
+
+await Promise.all(tasks);
