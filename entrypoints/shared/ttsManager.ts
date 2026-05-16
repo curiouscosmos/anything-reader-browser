@@ -1,4 +1,16 @@
 // @ts-nocheck
+import {
+  createPlayerDock,
+  getPlayerDockState,
+  loadPlayerDockState,
+  populatePlayerDockSpeedSelect,
+  populatePlayerDockVoiceSelect,
+  restorePlayerDockState,
+  savePlayerDockState,
+  updatePlayerDockState,
+  updatePlayerDockTheme,
+} from './player-dock';
+
 class TTSManager {
   constructor() {
     this.DEBUG_MODE = false;
@@ -106,7 +118,7 @@ class TTSManager {
 
     this.currentTheme = 'light';
 
-    this.createBottomFloatingUI();
+    createPlayerDock(this);
 
     this.detectAndApplyTheme();
 
@@ -1598,103 +1610,19 @@ class TTSManager {
   }
 
   getFloatingBarState() {
-    if (!this.bottomFloatingUI) return null;
-
-    const rect = this.bottomFloatingUI.getBoundingClientRect();
-    return {
-      position: {
-        left: Math.round(rect.left),
-        top: Math.round(rect.top),
-      },
-      width: Math.round(rect.width),
-      height: Math.round(rect.height),
-    };
+    return getPlayerDockState(this);
   }
 
   async saveFloatingBarState() {
-    try {
-      const state = this.getFloatingBarState();
-      if (!state) return;
-
-      await chrome.storage.sync.set({ 'ar-floating-bar-state': state });
-
-      localStorage.setItem('ar-floating-bar-state', JSON.stringify(state));
-    } catch (error) {
-      this.warn('Failed to save floating bar state:', error);
-      try {
-        const state = this.getFloatingBarState();
-        if (state) {
-          localStorage.setItem('ar-floating-bar-state', JSON.stringify(state));
-        }
-      } catch (localError) {
-        this.error('localStorage backup also failed:', localError);
-      }
-    }
+    return savePlayerDockState(this);
   }
 
   async loadFloatingBarState() {
-    try {
-      return new Promise((resolve) => {
-        chrome.storage.sync.get(['ar-floating-bar-state'], (result) => {
-          if (result['ar-floating-bar-state']) {
-            resolve(result['ar-floating-bar-state']);
-            return;
-          }
-
-          try {
-            const saved = localStorage.getItem('ar-floating-bar-state');
-            if (saved) {
-              const state = JSON.parse(saved);
-              chrome.storage.sync.set({ 'ar-floating-bar-state': state }).catch(() => {});
-              resolve(state);
-              return;
-            }
-          } catch (error) {
-            this.warn('Failed to load floating bar state from localStorage:', error);
-          }
-
-          resolve(null);
-        });
-      });
-    } catch (error) {
-      this.warn('Failed to load floating bar state from Chrome storage, falling back to localStorage:', error);
-      try {
-        const saved = localStorage.getItem('ar-floating-bar-state');
-        if (saved) {
-          return JSON.parse(saved);
-        }
-      } catch (localError) {
-        this.warn('Failed to load floating bar state from localStorage as well:', localError);
-      }
-      return null;
-    }
+    return loadPlayerDockState(this);
   }
 
   restoreFloatingBarState(state) {
-    if (!this.bottomFloatingUI || !state) return;
-
-    const originalTransition = this.bottomFloatingUI.style.transition;
-    this.bottomFloatingUI.style.transition = 'none';
-
-    const left = typeof state.position?.left === 'number' ? state.position.left : window.innerWidth - 144;
-    const top = typeof state.position?.top === 'number'
-      ? state.position.top
-      : Math.max(20, Math.min((window.innerHeight / 2) - 94, window.innerHeight - 220));
-
-    this.bottomFloatingUI.style.left = `${left}px`;
-    this.bottomFloatingUI.style.top = `${top}px`;
-    this.bottomFloatingUI.style.right = 'auto';
-    this.bottomFloatingUI.style.bottom = 'auto';
-    this.bottomFloatingUI.style.transform = 'none';
-    this.bottomFloatingUI.style.width = '124px';
-    this.bottomFloatingUI.style.padding = '10px 8px';
-    this.bottomFloatingUI.style.borderRadius = '14px';
-    this.bottomFloatingUI.style.transformOrigin = 'center center';
-    this.isMiddleFloating = true;
-
-    setTimeout(() => {
-      this.bottomFloatingUI.style.transition = originalTransition;
-    }, 0);
+    return restorePlayerDockState(this, state);
   }
 
   async saveConsoleLogSetting(enabled) {
@@ -5622,63 +5550,6 @@ class TTSManager {
   }
 
 
-
-  updateBottomFloatingUITheme() {
-    if (!this.bottomFloatingUI) return;
-
-    const isDark = this.currentTheme === 'dark';
-
-    const bgColor = isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.2)';
-    const textColor = isDark ? 'rgba(255, 255, 255, 0.6)' : '#1d1d1d';
-    const borderColor = isDark ? 'rgba(125, 125, 125, 0.25)' : 'rgba(100, 100, 100, 0.4)';
-
-    this.bottomFloatingUI.style.background = bgColor;
-    this.bottomFloatingUI.style.backdropFilter = 'blur(10px)';
-    this.bottomFloatingUI.style.webkitBackdropFilter = 'blur(10px)';
-    this.bottomFloatingUI.style.color = textColor;
-
-    if (this.bottomFloatingButton) {
-      this.bottomFloatingButton.style.background = 'rgba(255, 255, 255, 0.08)';
-      this.bottomFloatingButton.style.color = textColor;
-      this.bottomFloatingButton.style.textAlign = 'center';
-      this.bottomFloatingButton.style.textDecoration = 'none';
-      this.bottomFloatingButton.style.borderColor = borderColor;
-    }
-
-    if (this.voiceSelect) {
-      this.voiceSelect.style.background = 'rgba(255, 255, 255, 0.08)';
-      this.voiceSelect.style.color = textColor;
-      this.voiceSelect.style.borderColor = borderColor;
-    }
-
-    if (this.speedSelect) {
-      this.speedSelect.style.background = 'rgba(255, 255, 255, 0.08)';
-      this.speedSelect.style.color = textColor;
-      this.speedSelect.style.borderColor = borderColor;
-    }
-
-    if (this.moveHandle) {
-      this.moveHandle.style.cursor = 'grab';
-    }
-
-    if (this.floatingLogo) {
-      this.floatingLogo.style.cursor = 'default';
-    }
-
-    if (this.floatingLogo) {
-      const logoImg = this.floatingLogo.querySelector('img');
-      if (logoImg) {
-        logoImg.style.opacity = '1';
-      }
-    }
-
-    if (this.bottomFloatingUI) {
-      this.bottomFloatingUI.style.borderColor = borderColor;
-    }
-
-    this.updateBottomFloatingUIState();
-  }
-
   updatearText() {
     const arText = document.getElementById('tts-ar-text');
     if (arText) {
@@ -5689,403 +5560,12 @@ class TTSManager {
     }
   }
 
+  updateBottomFloatingUITheme() {
+    return updatePlayerDockTheme(this);
+  }
+
   createBottomFloatingUI() {
-    if (this.bottomFloatingUI) {
-      this.bottomFloatingUI.remove();
-    }
-
-    const existingScrollSpacer = document.getElementById('tts-bottom-scroll-spacer');
-    if (existingScrollSpacer) {
-      existingScrollSpacer.remove();
-    }
-
-    const isDark = this.currentTheme === 'dark';
-    const bgColor = isDark ? 'rgba(0, 0, 0, 0.4)' : 'rgba(255, 255, 255, 0.7)';
-    const textColor = isDark ? 'rgba(255, 255, 255, 0.6)' : '#1d1d1d';
-    const borderColor = isDark ? 'rgba(125, 125, 125, 0.25)' : 'rgba(100, 100, 100, 0.4)';
-
-    this.bottomFloatingUI = document.createElement('div');
-    this.bottomFloatingUI.id = 'tts-bottom-floating-ui';
-    this.bottomFloatingUI.style.cssText = `
-      position: fixed !important;
-      top: 50% !important;
-      right: 20px !important;
-      left: auto !important;
-      bottom: auto !important;
-      transform: translateY(-50%) !important;
-      width: 124px !important;
-      min-width: 124px !important;
-      max-width: 124px !important;
-      z-index: 2147483637 !important;
-      padding: 10px 8px !important;
-      margin: 0 !important;
-      background: ${bgColor} !important;
-      backdrop-filter: blur(10px) !important;
-      -webkit-backdrop-filter: blur(10px) !important;
-      color: ${textColor} !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      display: none !important;
-      border: 1px solid ${borderColor} !important;
-      border-radius: 14px !important;
-      cursor: default !important;
-      user-select: none !important;
-      transition: all 0.3s ease !important;
-      box-sizing: border-box !important;
-    `;
-
-    const dock = document.createElement('div');
-    dock.style.cssText = `
-      width: 100% !important;
-      display: flex !important;
-      flex-direction: column !important;
-      align-items: stretch !important;
-      gap: 8px !important;
-      padding: 0 !important;
-      box-sizing: border-box !important;
-    `;
-
-    const headerRow = document.createElement('div');
-    headerRow.style.cssText = `
-      display: flex !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      gap: 10px !important;
-      width: 100% !important;
-      box-sizing: border-box !important;
-    `;
-
-    const logoWrap = document.createElement('button');
-    logoWrap.type = 'button';
-    logoWrap.title = 'Anything Reader';
-    logoWrap.setAttribute('aria-label', 'Anything Reader');
-    logoWrap.style.cssText = `
-      appearance: none !important;
-      background: transparent !important;
-      border: 0 !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      cursor: default !important;
-      flex-shrink: 0 !important;
-    `;
-
-    const svgIcon = document.createElement('img');
-    svgIcon.src = chrome.runtime.getURL('icon128_on.png');
-    svgIcon.alt = 'Anything Reader';
-    svgIcon.style.cssText = `
-      pointer-events: auto !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      width: 24px !important;
-      height: 24px !important;
-      object-fit: contain !important;
-      border-radius: 6px !important;
-    `;
-
-    logoWrap.appendChild(svgIcon);
-
-    this.moveHandle = document.createElement('button');
-    this.moveHandle.type = 'button';
-    this.moveHandle.title = 'Move';
-    this.moveHandle.setAttribute('aria-label', 'Move player');
-    this.moveHandle.style.cssText = `
-      appearance: none !important;
-      background: transparent !important;
-      border: 0 !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      cursor: grab !important;
-      flex-shrink: 0 !important;
-      width: 18px !important;
-      height: 18px !important;
-    `;
-
-    const handlerColor = this.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : '#1d1d1d';
-    this.moveHandle.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 8 14" xmlns="http://www.w3.org/2000/svg" style="display:block; width:14px; height:14px;">
-        <circle cx="2" cy="2" r="1" fill="${handlerColor}"/>
-        <circle cx="6" cy="2" r="1" fill="${handlerColor}"/>
-        <circle cx="2" cy="7" r="1" fill="${handlerColor}"/>
-        <circle cx="6" cy="7" r="1" fill="${handlerColor}"/>
-        <circle cx="2" cy="12" r="1" fill="${handlerColor}"/>
-        <circle cx="6" cy="12" r="1" fill="${handlerColor}"/>
-      </svg>
-    `;
-
-    const controls = document.createElement('div');
-    controls.style.cssText = `
-      display: flex !important;
-      flex-direction: column !important;
-      gap: 8px !important;
-      width: 100% !important;
-    `;
-
-    this.bottomFloatingButton = document.createElement('button');
-    this.bottomFloatingButton.type = 'button';
-    this.bottomFloatingButton.setAttribute('data-action', 'toggle-playback');
-    this.bottomFloatingButton.style.cssText = `
-      width: 100% !important;
-      height: 40px !important;
-      min-height: 40px !important;
-      background: rgba(255, 255, 255, 0.08) !important;
-      color: ${textColor} !important;
-      border: 1px solid ${borderColor} !important;
-      box-shadow: none !important;
-      font-size: 14px !important;
-      font-weight: normal !important;
-      text-transform: none !important;
-      cursor: pointer !important;
-      transition: all 0.3s !important;
-      font-family: inherit !important;
-      outline: none !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      text-align: center !important;
-      white-space: nowrap !important;
-      z-index: 1 !important;
-      text-decoration: none !important;
-      border-radius: 10px !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-    `;
-
-    this.voiceSelect = document.createElement('select');
-    this.voiceSelect.style.cssText = `
-      width: 100% !important;
-      height: 32px !important;
-      min-height: 32px !important;
-      background: rgba(255, 255, 255, 0.08) !important;
-      color: ${textColor} !important;
-      border: 1px solid ${borderColor} !important;
-      border-radius: 10px !important;
-      font-size: 12px !important;
-      font-family: inherit !important;
-      cursor: pointer !important;
-      outline: none !important;
-      padding: 0 8px !important;
-      box-sizing: border-box !important;
-    `;
-
-    this.speedSelect = document.createElement('select');
-    this.speedSelect.style.cssText = `
-      width: 100% !important;
-      height: 32px !important;
-      min-height: 32px !important;
-      background: rgba(255, 255, 255, 0.08) !important;
-      color: ${textColor} !important;
-      border: 1px solid ${borderColor} !important;
-      border-radius: 10px !important;
-      font-size: 12px !important;
-      font-family: inherit !important;
-      cursor: pointer !important;
-      outline: none !important;
-      padding: 0 8px !important;
-      box-sizing: border-box !important;
-    `;
-
-    const playerRow = document.createElement('div');
-    playerRow.style.cssText = `
-      display: flex !important;
-      align-items: center !important;
-      gap: 8px !important;
-      width: 100% !important;
-      justify-content: space-between !important;
-    `;
-
-    this.bottomFloatingButton.innerHTML = `
-      <svg width="18" height="18" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" style="display:block; width:18px; height:18px; fill:${textColor};">
-        <path d="M346.8,785.1c-5,0-10-1.2-14.5-3.7-9.6-5.3-15.5-15.3-15.5-26.3V244.9c0-10.9,5.9-21,15.5-26.3,9.6-5.3,21.3-4.9,30.5.9l404.2,255.1c8.7,5.5,14,15.1,14,25.4s-5.3,19.9-14,25.4l-404.2,255.1c-4.9,3.1-10.4,4.6-16,4.6Z"></path>
-      </svg>
-    `;
-
-    playerRow.appendChild(this.bottomFloatingButton);
-    playerRow.appendChild(this.moveHandle);
-
-    controls.appendChild(this.voiceSelect);
-    controls.appendChild(this.speedSelect);
-    controls.appendChild(playerRow);
-
-    this.floatingLogo = logoWrap;
-    logoWrap.style.cssText += `
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      flex-shrink: 0 !important;
-    `;
-
-    logoWrap.addEventListener('click', (event) => {
-      event.stopPropagation();
-      this.updateStatus('Anything Reader', '#4CAF50');
-    });
-
-    headerRow.appendChild(logoWrap);
-    headerRow.appendChild(this.moveHandle);
-    dock.appendChild(headerRow);
-    dock.appendChild(this.voiceSelect);
-    dock.appendChild(this.speedSelect);
-    dock.appendChild(this.bottomFloatingButton);
-    this.bottomFloatingUI.appendChild(dock);
-
-    this.populateDockVoiceSelect();
-    this.populateDockSpeedSelect();
-
-    if (this.bottomFloatingButton) {
-      this.bottomFloatingButton.addEventListener('click', (event) => {
-        this.handleBottomFloatingButtonClick(event);
-      });
-    }
-
-    this.setupDraggableFloatingBar();
-
-    this.voiceSelect.addEventListener('change', async (event) => {
-      event.stopPropagation();
-      const voice = this.VOICES.find(v => v.id === this.voiceSelect.value) || this.getDefaultVoiceForModel();
-      await this.selectVoice(voice);
-    });
-
-    this.speedSelect.addEventListener('change', async (event) => {
-      event.stopPropagation();
-      const speed = Number(this.speedSelect.value) || this.playbackSpeed;
-      const previousSpeed = this.playbackSpeed;
-      this.playbackSpeed = speed;
-      await this.saveSpeedSetting(speed);
-      this.updateBottomFloatingUIState();
-      if (previousSpeed !== this.playbackSpeed) {
-        this.handleVoiceOrSpeedChange('speed_change');
-      }
-    });
-
-    document.body.appendChild(this.bottomFloatingUI);
-
-    this.bottomFloatingUI.style.display = 'none';
-
-    this.updateBottomFloatingUITheme();
-    this.updateBottomFloatingUIState();
-
-    this.loadFloatingBarState().then((state) => {
-      if (state) {
-        this.restoreFloatingBarState(state);
-      }
-    });
-  }
-
-  setupDraggableFloatingBar() {
-    if (!this.bottomFloatingUI) return;
-
-    let isDragging = false;
-    let startX = 0;
-    let startY = 0;
-    let startTop = 0;
-    let startLeft = 0;
-    const handle = this.moveHandle;
-
-    const handleMouseDown = (e) => {
-      isDragging = true;
-      startY = e.clientY;
-      startX = e.clientX;
-      const rect = this.bottomFloatingUI.getBoundingClientRect();
-      startTop = rect.top;
-      startLeft = rect.left;
-      this.bottomFloatingUI.style.transition = 'none';
-      this.bottomFloatingUI.style.opacity = '0.9';
-      if (handle) {
-        handle.style.cursor = 'grabbing';
-      }
-      e.preventDefault();
-    };
-
-    const handleMouseMove = (e) => {
-      if (!isDragging) return;
-      const deltaX = e.clientX - startX;
-      const deltaY = e.clientY - startY;
-      const rect = this.bottomFloatingUI.getBoundingClientRect();
-      const width = rect.width;
-      const height = rect.height;
-      const left = Math.max(0, Math.min(startLeft + deltaX, window.innerWidth - width));
-      const top = Math.max(0, Math.min(startTop + deltaY, window.innerHeight - height));
-      this.bottomFloatingUI.style.left = `${left}px`;
-      this.bottomFloatingUI.style.top = `${top}px`;
-      this.bottomFloatingUI.style.right = 'auto';
-      this.bottomFloatingUI.style.bottom = 'auto';
-      this.bottomFloatingUI.style.transform = 'none';
-    };
-
-    const handleMouseUp = () => {
-      if (!isDragging) return;
-
-      isDragging = false;
-      this.bottomFloatingUI.style.transition = 'all 0.3s ease';
-      this.bottomFloatingUI.style.opacity = '1';
-      if (handle) {
-        handle.style.cursor = 'grab';
-      }
-
-      this.saveFloatingBarState();
-    };
-
-    if (handle) {
-      handle.addEventListener('mousedown', handleMouseDown);
-    }
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    if (handle) {
-      handle.addEventListener('touchstart', (e) => {
-      isDragging = true;
-      startY = e.touches[0].clientY;
-      startX = e.touches[0].clientX;
-      this.bottomFloatingUI.style.transition = 'none';
-      this.bottomFloatingUI.style.opacity = '0.8';
-      const rect = this.bottomFloatingUI.getBoundingClientRect();
-      startTop = rect.top;
-      startLeft = rect.left;
-      handle.style.cursor = 'grabbing';
-
-      e.preventDefault();
-      });
-
-      document.addEventListener('touchmove', (e) => {
-        if (!isDragging) return;
-        const deltaX = e.touches[0].clientX - startX;
-        const deltaY = e.touches[0].clientY - startY;
-        const rect = this.bottomFloatingUI.getBoundingClientRect();
-        const width = rect.width;
-        const height = rect.height;
-        const left = Math.max(0, Math.min(startLeft + deltaX, window.innerWidth - width));
-        const top = Math.max(0, Math.min(startTop + deltaY, window.innerHeight - height));
-        this.bottomFloatingUI.style.left = `${left}px`;
-        this.bottomFloatingUI.style.top = `${top}px`;
-        this.bottomFloatingUI.style.right = 'auto';
-        this.bottomFloatingUI.style.bottom = 'auto';
-        this.bottomFloatingUI.style.transform = 'none';
-        e.preventDefault();
-      });
-      document.addEventListener('touchend', handleMouseUp);
-    }
-  }
-
-  resetFloatingBarPosition() {
-    if (!this.bottomFloatingUI) return;
-
-    const width = 124;
-    const height = 188;
-    this.bottomFloatingUI.style.left = 'auto';
-    this.bottomFloatingUI.style.right = '20px';
-    this.bottomFloatingUI.style.top = `calc(50% - ${height / 2}px)`;
-    this.bottomFloatingUI.style.bottom = 'auto';
-    this.bottomFloatingUI.style.transform = 'none';
-    this.bottomFloatingUI.style.width = `${width}px`;
-    this.bottomFloatingUI.style.padding = '10px 8px';
-    this.bottomFloatingUI.style.borderRadius = '14px';
-    this.bottomFloatingUI.style.transformOrigin = 'center center';
-    this.bottomFloatingUI.style.transition = 'all 0.3s ease';
+    return createPlayerDock(this);
   }
 
   getSpeedText(speed) {
@@ -6365,71 +5845,15 @@ class TTSManager {
   }
 
   updateBottomFloatingUIState() {
-    if (!this.bottomFloatingButton) return;
-
-    const isPlaying = this.isPlaying && !this.isPaused;
-    const isPaused = this.isPlaying && this.isPaused;
-    const textColor = this.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.8)' : '#1d1d1d';
-    const fillColor = this.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.82)' : '#1d1d1d';
-    const iconPath = isPlaying
-      ? '<path d="M596.1,235.5h163.8v529h-163.8z M316,235.5h163.8v529h-163.8z"/>'
-      : '<path d="M346.8,785.1c-5,0-10-1.2-14.5-3.7-9.6-5.3-15.5-15.3-15.5-26.3V244.9c0-10.9,5.9-21,15.5-26.3,9.6-5.3,21.3-4.9,30.5.9l404.2,255.1c8.7,5.5,14,15.1,14,25.4s-5.3,19.9-14,25.4l-404.2,255.1c-4.9,3.1-10.4,4.6-16,4.6Z"/>';
-
-    this.populateDockVoiceSelect();
-    this.populateDockSpeedSelect();
-
-    this.voiceSelect.value = this.selectedVoice?.id || this.getDefaultVoiceForModel().id;
-    this.speedSelect.value = String(this.playbackSpeed);
-
-    this.bottomFloatingButton.innerHTML = `
-      <svg width="18" height="18" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" style="display:block; width:18px; height:18px; fill:${fillColor}; opacity:${this.isPageReadError ? 0.4 : 1};">
-        ${iconPath}
-      </svg>
-    `;
-    this.bottomFloatingButton.title = this.isPageReadError
-      ? (this.lastPageReadError ? `TTS error: ${this.lastPageReadError}` : 'TTS error')
-      : (isPlaying ? 'Pause' : isPaused ? 'Resume' : 'Play');
-    this.bottomFloatingButton.disabled = false;
-    this.bottomFloatingButton.style.cursor = 'pointer';
-    this.bottomFloatingButton.style.opacity = this.isPageReadError ? '0.6' : '1';
-
-    if (this.bottomFloatingUI) {
-      this.bottomFloatingUI.title = this.bottomFloatingUI.title || 'Anything Reader';
-    }
+    return updatePlayerDockState(this);
   }
 
   populateDockVoiceSelect() {
-    if (!this.voiceSelect) return;
-
-    const currentVoiceId = this.selectedVoice?.id;
-    this.voiceSelect.replaceChildren();
-
-    this.VOICES.forEach((voice) => {
-      const option = document.createElement('option');
-      option.value = voice.id;
-      option.textContent = voice.name;
-      option.title = voice.description;
-      this.voiceSelect.appendChild(option);
-    });
-
-    this.voiceSelect.value = this.VOICES.some((voice) => voice.id === currentVoiceId)
-      ? currentVoiceId
-      : this.getDefaultVoiceForModel().id;
+    return populatePlayerDockVoiceSelect(this);
   }
 
   populateDockSpeedSelect() {
-    if (!this.speedSelect) return;
-
-    this.speedSelect.replaceChildren();
-
-    this.SPEED_OPTIONS.forEach((speedOption) => {
-      const option = document.createElement('option');
-      option.value = String(speedOption.speed);
-      option.textContent = speedOption.text;
-      this.speedSelect.appendChild(option);
-    });
-
-    this.speedSelect.value = String(this.playbackSpeed);
+    return populatePlayerDockSpeedSelect(this);
   }
 
   async handleBottomFloatingButtonClick(event) {

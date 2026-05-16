@@ -32,7 +32,7 @@ for (const sourceDir of sourceDirs) {
     tasks.push(build({
       entryPoints: [source],
       outfile: path.join(publicAssetsDir, `${parsed.name}.js`),
-      bundle: false,
+      bundle: true,
       format: 'iife',
       platform: 'browser',
       target: 'es2020',
