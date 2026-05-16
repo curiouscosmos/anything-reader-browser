@@ -35,3 +35,4 @@ public/ort/
 *.onnx
 assets/onnx
 assets/kittenTTS
+assets/supertonic

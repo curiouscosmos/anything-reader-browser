@@ -2,10 +2,10 @@ import { createSupertonicTtsEngine, type TtsAction, type TtsGenerateData } from 
 
 const ttsEngine = createSupertonicTtsEngine({
   debugPrefix: '[Anything Reader][Offscreen]',
-  modelRoot: browser.runtime.getURL('onnx' as never),
-  voiceStyleRoot: browser.runtime.getURL('voice_styles' as never),
+  modelRoot: browser.runtime.getURL('supertonic/onnx' as never),
+  voiceStyleRoot: browser.runtime.getURL('supertonic/voice_styles' as never),
   kittenRoot: browser.runtime.getURL('kittenTTS' as never),
-  ortWasmRoot: browser.runtime.getURL('ort/' as never),
+  ortWasmRoot: browser.runtime.getURL('supertonic/ort/' as never),
   primaryExecutionProviders: ['webgpu', 'wasm'],
   fallbackExecutionProviders: ['wasm'],
 });

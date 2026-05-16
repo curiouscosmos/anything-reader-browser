@@ -34,7 +34,7 @@ export default defineConfig({
     ],
     web_accessible_resources: [
       {
-        resources: ['icon*.png', 'kittenTTS/*', 'onnx/*', 'ort/*', 'reader.html', 'reader.js', 'reader-init.js', 'voice_styles/*'],
+        resources: ['icon*.png', 'kittenTTS/*', 'supertonic/onnx/*', 'supertonic/ort/*', 'reader.html', 'reader.js', 'reader-init.js', 'supertonic/voice_styles/*'],
         matches: ['<all_urls>'],
       },
     ],

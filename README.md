@@ -5,9 +5,9 @@ Anything Reader is a browser extension that places speaker buttons in front of r
 ## Requirements
 
 - Chrome or Firefox
-- Supertonic ONNX assets available under `assets/onnx/`
-- Supertonic voice styles available under `assets/voice_styles/`
-- ONNX Runtime wasm files available under `assets/ort/`
+- Supertonic ONNX assets available under `assets/supertonic/onnx/`
+- Supertonic voice styles available under `assets/supertonic/voice_styles/`
+- ONNX Runtime wasm files available under `assets/supertonic/ort/`
 
 The `example/anything-reader-extension/` folder is the implementation blueprint the app follows.
 
@@ -76,9 +76,9 @@ yarn compile
 
 If speaker buttons do not appear:
 
-- confirm the Supertonic ONNX files exist under `assets/onnx/`
-- confirm the voice style JSON exists under `assets/voice_styles/`
-- confirm the ONNX Runtime wasm files exist under `assets/ort/`
+- confirm the Supertonic ONNX files exist under `assets/supertonic/onnx/`
+- confirm the voice style JSON exists under `assets/supertonic/voice_styles/`
+- confirm the ONNX Runtime wasm files exist under `assets/supertonic/ort/`
 - open the content-script console and look for the Supertonic load error
 - refresh the page or use the popup's refresh action after changing the DOM
 
