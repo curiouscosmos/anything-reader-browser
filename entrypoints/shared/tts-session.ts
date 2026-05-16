@@ -15,7 +15,15 @@ export async function initializeSupertonic(manager, showErrors = true) {
 
   manager.supertonicInitPromise = (async () => {
     try {
+      if (manager.shouldStopSequentialPlayback || (manager.abortController && manager.abortController.signal.aborted)) {
+        return;
+      }
+
       const result = await manager.sendTTSMessage('tts-initialize', { model: manager.ttsModel });
+
+      if (manager.shouldStopSequentialPlayback || (manager.abortController && manager.abortController.signal.aborted)) {
+        return;
+      }
 
       if (!result.success) {
         if (result.error === 'low_power') {
@@ -51,7 +59,16 @@ export async function warmupTTSModel(manager) {
     return manager.supertonicInitPromise;
   }
 
-  window.setTimeout(() => {
+  if (manager.pendingWarmupTimeout) {
+    clearTimeout(manager.pendingWarmupTimeout);
+    manager.pendingWarmupTimeout = null;
+  }
+
+  manager.pendingWarmupTimeout = window.setTimeout(() => {
+    manager.pendingWarmupTimeout = null;
+    if (manager.shouldStopSequentialPlayback || (manager.abortController && manager.abortController.signal.aborted)) {
+      return;
+    }
     initializeSupertonic(manager, false).catch((error) => {
       manager.warn('TTS warmup failed:', error);
     });

@@ -48,9 +48,9 @@ export function createPlayerDock(manager: PlayerDockManager) {
   }
 
   const isDark = manager.currentTheme === 'dark';
-  const bgColor = isDark ? 'rgba(0, 0, 0, 0.4)' : 'rgba(255, 255, 255, 0.7)';
-  const textColor = isDark ? 'rgba(255, 255, 255, 0.6)' : '#1d1d1d';
-  const borderColor = isDark ? 'rgba(125, 125, 125, 0.25)' : 'rgba(100, 100, 100, 0.4)';
+  const bgColor = '#000000';
+  const textColor = '#ffffff';
+  const borderColor = '#ddd';
 
   const root = document.createElement('div');
   root.id = 'tts-bottom-floating-ui';
@@ -141,6 +141,7 @@ export function createPlayerDock(manager: PlayerDockManager) {
     height: 32px !important;
     min-height: 32px !important;
     background: rgba(255, 255, 255, 0.08) !important;
+    background: #000000 !important;
     color: ${textColor} !important;
     border: 1px solid ${borderColor} !important;
     border-radius: 10px !important;
@@ -159,6 +160,7 @@ export function createPlayerDock(manager: PlayerDockManager) {
     height: 32px !important;
     min-height: 32px !important;
     background: rgba(255, 255, 255, 0.08) !important;
+    background: #000000 !important;
     color: ${textColor} !important;
     border: 1px solid ${borderColor} !important;
     border-radius: 10px !important;
@@ -179,6 +181,7 @@ export function createPlayerDock(manager: PlayerDockManager) {
     height: 40px !important;
     min-height: 40px !important;
     background: rgba(255, 255, 255, 0.08) !important;
+    background: #000000 !important;
     color: ${textColor} !important;
     border: 1px solid ${borderColor} !important;
     box-shadow: none !important;
@@ -276,9 +279,9 @@ export function updatePlayerDockTheme(manager: PlayerDockManager) {
   if (!manager.bottomFloatingUI) return;
 
   const isDark = manager.currentTheme === 'dark';
-  const bgColor = isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.2)';
-  const textColor = isDark ? 'rgba(255, 255, 255, 0.6)' : '#1d1d1d';
-  const borderColor = isDark ? 'rgba(125, 125, 125, 0.25)' : 'rgba(100, 100, 100, 0.4)';
+  const bgColor = '#000000';
+  const textColor = '#ffffff';
+  const borderColor = '#ddd';
 
   manager.bottomFloatingUI.style.background = bgColor;
   manager.bottomFloatingUI.style.backdropFilter = 'blur(10px)';
@@ -287,19 +290,19 @@ export function updatePlayerDockTheme(manager: PlayerDockManager) {
   manager.bottomFloatingUI.style.borderColor = borderColor;
 
   if (manager.bottomFloatingButton) {
-    manager.bottomFloatingButton.style.background = 'rgba(255, 255, 255, 0.08)';
+    manager.bottomFloatingButton.style.background = '#000000';
     manager.bottomFloatingButton.style.color = textColor;
     manager.bottomFloatingButton.style.borderColor = borderColor;
   }
 
   if (manager.voiceSelect) {
-    manager.voiceSelect.style.background = 'rgba(255, 255, 255, 0.08)';
+    manager.voiceSelect.style.background = '#000000';
     manager.voiceSelect.style.color = textColor;
     manager.voiceSelect.style.borderColor = borderColor;
   }
 
   if (manager.speedSelect) {
-    manager.speedSelect.style.background = 'rgba(255, 255, 255, 0.08)';
+    manager.speedSelect.style.background = '#000000';
     manager.speedSelect.style.color = textColor;
     manager.speedSelect.style.borderColor = borderColor;
   }
@@ -359,7 +362,7 @@ export function updatePlayerDockState(manager: PlayerDockManager) {
 
   const isPlaying = manager.isPlaying && !manager.isPaused;
   const isPaused = manager.isPlaying && manager.isPaused;
-  const fillColor = manager.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.82)' : '#1d1d1d';
+  const fillColor = '#ffffff';
   const iconPath = isPlaying
     ? '<path d="M596.1,235.5h163.8v529h-163.8z M316,235.5h163.8v529h-163.8z"/>'
     : '<path d="M346.8,785.1c-5,0-10-1.2-14.5-3.7-9.6-5.3-15.5-15.3-15.5-26.3V244.9c0-10.9,5.9-21,15.5-26.3,9.6-5.3,21.3-4.9,30.5.9l404.2,255.1c8.7,5.5,14,15.1,14,25.4s-5.3,19.9-14,25.4l-404.2,255.1c-4.9,3.1-10.4,4.6-16,4.6Z"/>';

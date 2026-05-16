@@ -74,6 +74,7 @@ class TTSManager {
     this.preTakes = [];
     this.currentAudio = null;
     this.pendingSequentialPlaybackTimeout = null;
+    this.pendingWarmupTimeout = null;
     this.pauseResumeTargetIndex = null;
     this.audioCache = new Map();
     this.audioPrefetchPromises = new Map();
@@ -6190,7 +6191,14 @@ class TTSManager {
       } else {
         this.updateStatus(`Generating audio... (${takeIndex + 1}/${this.takes.length})`, '#FF9800');
         audioUrl = await this.convertToSpeech(take);
+        if (this.shouldStopSequentialPlayback || (this.abortController && this.abortController.signal?.aborted)) {
+          return;
+        }
         this.addToAudioCache(cacheKey, audioUrl);
+      }
+
+      if (this.shouldStopSequentialPlayback || (this.abortController && this.abortController.signal?.aborted)) {
+        return;
       }
 
       await this.playAudio(audioUrl, takeIndex);
@@ -6313,14 +6321,26 @@ class TTSManager {
     const chunkIndex = typeof chunkIndexOrAbortController === 'number' ? chunkIndexOrAbortController : 0;
     const abortController = chunkIndexOrAbortController instanceof AbortController ? chunkIndexOrAbortController : this.abortController;
 
+    if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
+      return null;
+    }
+
     let processedText = text;
     if (window.textPreprocessor) {
       processedText = window.textPreprocessor.preprocess(text);
     }
 
     try {
+      if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
+        return null;
+      }
+
       if (!this.ttsInitialized) {
         await this.initializeSupertonic();
+      }
+
+      if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
+        return null;
       }
 
       const speechLength = 1.0 / (this.playbackSpeed + 0.05);
@@ -6337,8 +6357,16 @@ class TTSManager {
         language: pageLang
       });
 
+      if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
+        return null;
+      }
+
       if (!result.success) {
         throw new Error(result.error || 'TTS generation failed');
+      }
+
+      if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
+        return null;
       }
 
       const binaryString = atob(result.audioBase64);
@@ -6346,6 +6374,11 @@ class TTSManager {
       for (let i = 0; i < binaryString.length; i++) {
         wavBytes[i] = binaryString.charCodeAt(i);
       }
+
+      if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
+        return null;
+      }
+
       const wavBlob = new Blob([wavBytes], { type: 'audio/wav' });
       const sampleRate = result.sampleRate;
 
@@ -6356,11 +6389,21 @@ class TTSManager {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const arrayBuffer = wavBytes.buffer.slice(0, wavBytes.byteLength);
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
+          return null;
+        }
         return { audioBuffer, sampleRate };
+      }
+
+      if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
+        return null;
       }
 
       return URL.createObjectURL(wavBlob);
     } catch (error) {
+      if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
+        return null;
+      }
       this.error('❌ Supertonic TTS generation failed:', error);
       throw error;
     }
@@ -6476,8 +6519,15 @@ class TTSManager {
       const audioUrls = [];
 
       for (let i = 0; i < chunks.length; i++) {
+        if (this.shouldStopSequentialPlayback || (this.abortController && this.abortController.signal?.aborted)) {
+          return null;
+        }
+
         try {
           const audioUrl = await this.generateSingleChunkAudio(chunks[i], this.selectedVoice, take.language, i);
+          if (!audioUrl) {
+            return null;
+          }
           audioUrls.push(audioUrl);
           this.updateStatus(`Generating audio... ${i + 1}/${chunks.length}`, '#FF9800');
         } catch (error) {
@@ -6488,6 +6538,10 @@ class TTSManager {
 
       this.updateStatus('Merging audio...', '#FF9800');
       const mergedAudioUrl = await this.mergeAudioUrls(audioUrls);
+
+      if (this.shouldStopSequentialPlayback || (this.abortController && this.abortController.signal?.aborted)) {
+        return null;
+      }
 
       return mergedAudioUrl;
 
@@ -6607,20 +6661,24 @@ class TTSManager {
         return null;
       }
 
-    const isMultiChunk = this.needsMultiChunk(apiText, take.language);
+      const isMultiChunk = this.needsMultiChunk(apiText, take.language);
 
       const abortController = this.abortController;
 
-    if (isMultiChunk) {
+      if (isMultiChunk) {
         audioUrl = await this.generateMultiChunkAudio(take, apiText, targetVoice, abortController);
-    } else {
+      } else {
         audioUrl = await this.generateSingleChunkAudio(apiText, targetVoice, take.language, abortController);
+      }
+
+      if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
+        return null;
       }
 
       if (audioUrl) {
         take.audioUrl = audioUrl;
 
-        if (playAfterGenerate) {
+        if (playAfterGenerate && !this.shouldStopSequentialPlayback && !(abortController && abortController.signal?.aborted)) {
           await this.playAudioWithTracking(audioUrl, take);
         }
       }
