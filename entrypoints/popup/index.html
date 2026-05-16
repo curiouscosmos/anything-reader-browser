@@ -13,7 +13,6 @@
         <img src="/icon128_on.png" alt="" class="popup-icon" />
         <div>
           <h1>Anything Reader</h1>
-          <p id="status-text">Ready</p>
         </div>
       </header>
 
@@ -78,6 +77,24 @@
         <div class="field">
           <span>Highlight Color</span>
           <div id="highlight-color-picker" class="color-picker" role="radiogroup" aria-label="Highlight Color"></div>
+        </div>
+      </section>
+
+      <section class="control-group native-actions">
+        <div class="native-note">
+          <p>
+            Anything Reader Mac app is required for this browser extension to work.
+            <a href="https://apps.apple.com/us/search?term=Anything%20Reader" target="_blank" rel="noreferrer">
+              Download it from the App Store
+            </a>
+          </p>
+        </div>
+
+        <p id="status-text" class="native-status"></p>
+
+        <div class="native-buttons">
+          <button type="button" id="read-with-mac-app" class="primary-button">Read with Mac App</button>
+          <button type="button" id="summarize-with-mac-app" class="secondary-button">Summarize with Mac App</button>
         </div>
       </section>
 

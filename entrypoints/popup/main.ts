@@ -1,3 +1,4 @@
+import { READ_CURRENT_PAGE_MESSAGE, type ReadResult } from '@/lib/native-messaging.ts';
 import './style.css';
 
 type VoiceOption = {
@@ -65,6 +66,8 @@ const voiceSelect = getSelect('voice-select');
 const speedSelect = getSelect('speed-select');
 const highlightColorPicker = getElement('highlight-color-picker');
 const statusText = getElement('status-text');
+const readWithMacAppButton = getButton('read-with-mac-app');
+const summarizeWithMacAppButton = getButton('summarize-with-mac-app');
 
 let currentModel: TtsModel = DEFAULT_MODEL;
 
@@ -113,6 +116,37 @@ async function initializePopup() {
   modelSelect.addEventListener('change', saveModelSetting);
   voiceSelect.addEventListener('change', saveVoiceSetting);
   speedSelect.addEventListener('change', saveSpeedSetting);
+  readWithMacAppButton.addEventListener('click', () => void handleNativeActionClick(false));
+  summarizeWithMacAppButton.addEventListener('click', () => void handleNativeActionClick(true));
+}
+
+async function handleNativeActionClick(summarize: boolean) {
+  const actionText = summarize ? 'Summarizing the active page...' : 'Reading the active page...';
+  readWithMacAppButton.disabled = true;
+  summarizeWithMacAppButton.disabled = true;
+  setStatus(actionText);
+
+  try {
+    const response = (await browser.runtime.sendMessage({
+      type: READ_CURRENT_PAGE_MESSAGE,
+      summarize,
+    })) as ReadResult | undefined;
+
+    if (!response || !response.ok) {
+      throw new Error(response?.error ?? 'Unable to read the current page.');
+    }
+
+    setStatus(
+      summarize
+        ? `Sent ${response.textLength.toLocaleString()} characters to Anything Reader for summarization.`
+        : `Sent ${response.textLength.toLocaleString()} characters to Anything Reader.`,
+    );
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : String(error), true);
+  } finally {
+    readWithMacAppButton.disabled = false;
+    summarizeWithMacAppButton.disabled = false;
+  }
 }
 
 async function syncLiveReaderSettings() {
@@ -296,6 +330,10 @@ function getInput(id: string) {
 
 function getSelect(id: string) {
   return getElement(id) as HTMLSelectElement;
+}
+
+function getButton(id: string) {
+  return getElement(id) as HTMLButtonElement;
 }
 
 function increaseSaturation(hex: string, percent = 30) {

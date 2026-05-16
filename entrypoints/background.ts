@@ -1,7 +1,32 @@
 import type { TtsAction } from '@/lib/tts-engine.ts';
+import {
+  clampText,
+  describeTabMessageError,
+  EXTRACT_READABLE_TEXT_MESSAGE,
+  formatError,
+  isReadCurrentPageRequest,
+  normalizeText,
+  sendTextToNativeApp,
+  type NativePayload,
+  type ReadResult,
+} from '@/lib/native-messaging.ts';
 
 export default defineBackground(() => {
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (isReadCurrentPageRequest(message)) {
+      void readCurrentPageAndSendToMac(message.summarize === true)
+        .then(sendResponse)
+        .catch((error) => {
+          console.error('[Anything Reader][Background] Native messaging request failed', error);
+          sendResponse({
+            ok: false,
+            error: formatError(error),
+          });
+        });
+
+      return true;
+    }
+
     if (isTtsMessage(message)) {
       void sendTtsMessage(message.action, message.data)
         .then(sendResponse)
@@ -83,6 +108,88 @@ export default defineBackground(() => {
     }
   });
 });
+
+async function readCurrentPageAndSendToMac(summarize: boolean): Promise<ReadResult> {
+  try {
+    const tab = await getActiveTab();
+    if (!tab?.id) {
+      return {
+        ok: false,
+        error: 'No active tab was found.',
+      };
+    }
+
+    let extracted:
+      | {
+          ok: true;
+          title: string;
+          site: string;
+          url: string;
+          text: string;
+          textLength: number;
+        }
+      | {
+          ok: false;
+          error: string;
+        }
+      | undefined;
+
+    try {
+      extracted = (await browser.tabs.sendMessage(tab.id, {
+        type: EXTRACT_READABLE_TEXT_MESSAGE,
+      })) as typeof extracted;
+    } catch (error) {
+      return {
+        ok: false,
+        error: describeTabMessageError(error),
+      };
+    }
+
+    if (!extracted || !extracted.ok) {
+      return {
+        ok: false,
+        error: extracted?.error ?? 'Could not extract readable text from the active page.',
+      };
+    }
+
+    const text = clampText(normalizeText(extracted.text));
+    if (!text) {
+      return {
+        ok: false,
+        error: 'No readable text was found on the active page.',
+      };
+    }
+
+    const payload: NativePayload = {
+      title: extracted.title,
+      site: extracted.site,
+      url: extracted.url,
+      text,
+      textLength: text.length,
+      ...(summarize ? { summarize: true as const } : {}),
+    };
+
+    await sendTextToNativeApp(payload);
+    return {
+      ok: true,
+      textLength: text.length,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: formatError(error),
+    };
+  }
+}
+
+async function getActiveTab() {
+  const [tab] = await browser.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+
+  return tab;
+}
 
 type TtsMessage = {
   action: TtsAction;

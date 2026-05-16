@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { EXTRACT_READABLE_TEXT_MESSAGE } from '@/lib/native-messaging.ts';
+import { extractReadableTextFromDocument } from '@/lib/readable-text.ts';
 import {
   createPlayerDock,
   getPlayerDockState,
@@ -441,6 +443,18 @@ class TTSManager {
 
   setupMessageListener() {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request?.type === EXTRACT_READABLE_TEXT_MESSAGE) {
+        try {
+          sendResponse(extractReadableTextFromDocument(document));
+        } catch (error) {
+          sendResponse({
+            ok: false,
+            error: error instanceof Error && error.message ? error.message : 'No readable text was found on this page.',
+          });
+        }
+        return true;
+      }
+
       if (request.action === 'toggle') {
         this.togglePlugin(request.iconPosition);
         sendResponse({ success: true, enabled: this.isPluginEnabled });

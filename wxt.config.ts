@@ -6,8 +6,8 @@ export default defineConfig({
   manifest: ({ browser }) => ({
     permissions:
       browser === 'firefox'
-        ? ['activeTab', 'contextMenus', 'storage', 'tabs']
-        : ['activeTab', 'contextMenus', 'offscreen', 'storage', 'tabs'],
+        ? ['activeTab', 'contextMenus', 'nativeMessaging', 'storage', 'tabs']
+        : ['activeTab', 'contextMenus', 'nativeMessaging', 'offscreen', 'storage', 'tabs'],
     icons: {
       16: 'icon16_on.png',
       32: 'icon32_on.png',

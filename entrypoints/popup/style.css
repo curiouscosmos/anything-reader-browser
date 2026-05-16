@@ -1,6 +1,7 @@
 html {
   height: 100%;
   background: transparent;
+  overflow-y: auto;
 }
 
 * {
@@ -15,7 +16,9 @@ body {
   color: #202124;
   background: transparent;
   font: 13px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .popup-shell {
@@ -25,7 +28,7 @@ body {
   padding: 14px;
   background: #f7f8fa;
   border-radius: 16px;
-  overflow: hidden;
+  overflow: visible;
   min-height: calc(100vh - 16px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
@@ -52,6 +55,10 @@ h1 {
 p {
   margin: 2px 0 0;
   color: #5f6368;
+}
+
+#status-text {
+  margin: 0;
 }
 
 #status-text[data-state="error"] {
@@ -171,4 +178,72 @@ button:disabled {
   content: "A";
   color: #202124;
   font-weight: 750;
+}
+
+.native-actions {
+  gap: 12px;
+}
+
+.native-note p {
+  margin: 0;
+  color: #5f6368;
+  font-size: 12px;
+}
+
+.native-note a {
+  color: #276ef1;
+  text-decoration: none;
+}
+
+.native-note a:hover {
+  text-decoration: underline;
+}
+
+.native-status {
+  font-size: 12px;
+}
+
+.native-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.primary-button,
+.secondary-button {
+  flex: 1;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid #c7ced8;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.primary-button {
+  background: #276ef1;
+  color: #ffffff;
+  border-color: #276ef1;
+}
+
+.primary-button:hover {
+  background: #1f5fd4;
+  border-color: #1f5fd4;
+}
+
+.secondary-button {
+  background: #ffffff;
+  color: #202124;
+}
+
+.secondary-button:hover {
+  background: #eef3ff;
+  border-color: #9bb8ff;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
