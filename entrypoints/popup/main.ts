@@ -14,7 +14,6 @@ type ReaderSettingsResponse = {
   speed?: number;
   pluginEnabled?: boolean;
   floatingBarVisible?: boolean;
-  takeListVisible?: boolean;
   autoScrollEnabled?: boolean;
   highlightEnabled?: boolean;
   highlightColorIndex?: number;
@@ -58,7 +57,6 @@ const DEFAULT_HIGHLIGHT_COLOR_INDEX = 0;
 
 const enabledToggle = getInput('enabled-toggle');
 const barToggle = getInput('bar-toggle');
-const takeListToggle = getInput('take-list-toggle');
 const autoScrollToggle = getInput('auto-scroll-toggle');
 const highlightToggle = getInput('highlight-toggle');
 const modelSelect = getSelect('model-select');
@@ -78,7 +76,6 @@ async function initializePopup() {
     'ar-tts-model',
     'ar-plugin-enabled',
     'ar-floating-bar-visible',
-    'ar-take-list-visible',
     'ar-auto-scroll',
     'ar-highlight-enabled',
     'ar-highlight-color',
@@ -88,7 +85,6 @@ async function initializePopup() {
 
   enabledToggle.checked = settings['ar-plugin-enabled'] !== false;
   barToggle.checked = settings['ar-floating-bar-visible'] !== false;
-  takeListToggle.checked = settings['ar-take-list-visible'] !== false;
   autoScrollToggle.checked = settings['ar-auto-scroll'] !== false;
   highlightToggle.checked = settings['ar-highlight-enabled'] !== false;
 
@@ -111,7 +107,6 @@ async function initializePopup() {
 
   enabledToggle.addEventListener('change', () => saveBooleanSetting('ar-plugin-enabled', enabledToggle.checked));
   barToggle.addEventListener('change', () => saveBooleanSetting('ar-floating-bar-visible', barToggle.checked));
-  takeListToggle.addEventListener('change', () => saveBooleanSetting('ar-take-list-visible', takeListToggle.checked));
   autoScrollToggle.addEventListener('change', () => saveBooleanSetting('ar-auto-scroll', autoScrollToggle.checked));
   highlightToggle.addEventListener('change', () => saveBooleanSetting('ar-highlight-enabled', highlightToggle.checked));
   modelSelect.addEventListener('change', saveModelSetting);
@@ -136,9 +131,6 @@ async function syncLiveReaderSettings() {
     }
     if (typeof response.floatingBarVisible === 'boolean') {
       barToggle.checked = response.floatingBarVisible;
-    }
-    if (typeof response.takeListVisible === 'boolean') {
-      takeListToggle.checked = response.takeListVisible;
     }
     if (typeof response.autoScrollEnabled === 'boolean') {
       autoScrollToggle.checked = response.autoScrollEnabled;
