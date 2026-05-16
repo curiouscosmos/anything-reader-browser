@@ -14,7 +14,6 @@ type PlayerDockManager = {
   bottomFloatingButton: HTMLButtonElement | null;
   voiceSelect: HTMLSelectElement | null;
   speedSelect: HTMLSelectElement | null;
-  moveHandle: HTMLButtonElement | null;
   floatingLogo: HTMLButtonElement | null;
   tinyUIEnabled: boolean;
   updateStatus: (message: string, color?: string) => void;
@@ -135,37 +134,6 @@ export function createPlayerDock(manager: PlayerDockManager) {
   `;
   logoWrap.appendChild(logo);
 
-  const moveHandle = document.createElement('button');
-  moveHandle.type = 'button';
-  moveHandle.title = 'Move';
-  moveHandle.setAttribute('aria-label', 'Move player');
-  moveHandle.style.cssText = `
-    appearance: none !important;
-    background: transparent !important;
-    border: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    cursor: grab !important;
-    flex-shrink: 0 !important;
-    width: 18px !important;
-    height: 18px !important;
-  `;
-
-  const handlerColor = manager.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : '#1d1d1d';
-  moveHandle.innerHTML = `
-    <svg width="14" height="14" viewBox="0 0 8 14" xmlns="http://www.w3.org/2000/svg" style="display:block; width:14px; height:14px;">
-      <circle cx="2" cy="2" r="1" fill="${handlerColor}"/>
-      <circle cx="6" cy="2" r="1" fill="${handlerColor}"/>
-      <circle cx="2" cy="7" r="1" fill="${handlerColor}"/>
-      <circle cx="6" cy="7" r="1" fill="${handlerColor}"/>
-      <circle cx="2" cy="12" r="1" fill="${handlerColor}"/>
-      <circle cx="6" cy="12" r="1" fill="${handlerColor}"/>
-    </svg>
-  `;
-
   const voiceSelect = document.createElement('select');
   voiceSelect.style.cssText = `
     width: 100% !important;
@@ -240,13 +208,11 @@ export function createPlayerDock(manager: PlayerDockManager) {
   `;
 
   playerRow.appendChild(playButton);
-  playerRow.appendChild(moveHandle);
   dock.appendChild(headerRow);
   dock.appendChild(voiceSelect);
   dock.appendChild(speedSelect);
   dock.appendChild(playerRow);
   headerRow.appendChild(logoWrap);
-  headerRow.appendChild(moveHandle);
   root.appendChild(dock);
   document.body.appendChild(root);
 
@@ -254,7 +220,6 @@ export function createPlayerDock(manager: PlayerDockManager) {
   manager.bottomFloatingButton = playButton;
   manager.voiceSelect = voiceSelect;
   manager.speedSelect = speedSelect;
-  manager.moveHandle = moveHandle;
   manager.floatingLogo = logoWrap;
 
   populatePlayerDockVoiceSelect(manager);
@@ -327,10 +292,6 @@ export function updatePlayerDockTheme(manager: PlayerDockManager) {
     manager.speedSelect.style.background = 'rgba(255, 255, 255, 0.08)';
     manager.speedSelect.style.color = textColor;
     manager.speedSelect.style.borderColor = borderColor;
-  }
-
-  if (manager.moveHandle) {
-    manager.moveHandle.style.cursor = 'grab';
   }
 }
 
@@ -475,7 +436,7 @@ export function restorePlayerDockState(
 }
 
 function setupPlayerDockDrag(manager: PlayerDockManager) {
-  if (!manager.bottomFloatingUI || !manager.moveHandle) return;
+  if (!manager.bottomFloatingUI) return;
 
   let isDragging = false;
   let startX = 0;
@@ -483,7 +444,16 @@ function setupPlayerDockDrag(manager: PlayerDockManager) {
   let startTop = 0;
   let startLeft = 0;
 
+  const isInteractiveControl = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false;
+    return Boolean(target.closest('select, option'));
+  };
+
   const handleMouseDown = (e: MouseEvent) => {
+    if (isInteractiveControl(e.target)) {
+      return;
+    }
+
     isDragging = true;
     startX = e.clientX;
     startY = e.clientY;
@@ -495,7 +465,7 @@ function setupPlayerDockDrag(manager: PlayerDockManager) {
       manager.bottomFloatingUI.style.transition = 'none';
       manager.bottomFloatingUI.style.opacity = '0.9';
     }
-    manager.moveHandle!.style.cursor = 'grabbing';
+    manager.bottomFloatingUI.style.cursor = 'grabbing';
     e.preventDefault();
   };
 
@@ -519,12 +489,13 @@ function setupPlayerDockDrag(manager: PlayerDockManager) {
     if (manager.bottomFloatingUI) {
       manager.bottomFloatingUI.style.transition = 'all 0.3s ease';
       manager.bottomFloatingUI.style.opacity = '1';
+      manager.bottomFloatingUI.style.cursor = 'grab';
     }
-    manager.moveHandle!.style.cursor = 'grab';
     void savePlayerDockState(manager);
   };
 
-  manager.moveHandle.addEventListener('mousedown', handleMouseDown);
+  manager.bottomFloatingUI.style.cursor = 'grab';
+  manager.bottomFloatingUI.addEventListener('mousedown', handleMouseDown);
   document.addEventListener('mousemove', handleMouseMove);
   document.addEventListener('mouseup', handleMouseUp);
 }
