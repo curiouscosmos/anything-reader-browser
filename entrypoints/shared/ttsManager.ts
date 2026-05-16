@@ -145,6 +145,7 @@ class TTSManager {
     this.currentTakeWords = [];
     this.elementCache = new WeakMap();
     this.elementMetadata = new WeakSet();
+    this.boundTakeHoverElements = new WeakSet();
 
     this.initializeWhenReady();
 
@@ -2570,20 +2571,35 @@ class TTSManager {
           continue;
         }
 
-        const takeId = `take-${this.preTakes.length + 1}`;
         const language = 'en';
-
-        const preTake = {
-          id: takeId,
-          index: this.preTakes.length,
-          text: normalizedText,
-          language: language,
-          element: element,
+        const chunkedTakes = this.splitTextIntoTakes(normalizedText, {
+          domElement: element,
           selector: this.generateElementSelector(element),
-          audioUrl: null
-        };
+        });
 
-        this.preTakes.push(preTake);
+        if (chunkedTakes.length === 0) {
+          continue;
+        }
+
+        chunkedTakes.forEach((chunkTake, chunkIndex) => {
+          const nextTakeNumber = this.preTakes.length + 1;
+          const takeId = `take-${nextTakeNumber}`;
+          const preTake = {
+            id: takeId,
+            index: this.preTakes.length,
+            text: chunkTake.text,
+            language: chunkTake.language || language,
+            element: element,
+            selector: this.generateElementSelector(element),
+            audioUrl: null,
+            chunkIndex,
+            chunkCount: chunkedTakes.length,
+            elementInfo: chunkTake.elementInfo || null,
+            name: `Take ${nextTakeNumber}`,
+          };
+
+          this.preTakes.push(preTake);
+        });
       }
     }
 
@@ -2631,6 +2647,15 @@ class TTSManager {
     this.preTakes.forEach((take, index) => {
       if (take.element) {
         const smallestElement = this.findSmallestTextContainer(take.element, take.text);
+        if (!smallestElement) {
+          return;
+        }
+
+        if (this.boundTakeHoverElements.has(smallestElement)) {
+          return;
+        }
+
+        this.boundTakeHoverElements.add(smallestElement);
 
         smallestElement.addEventListener('mouseenter', (event) => {
           this.currentHoverTake = take;
@@ -3287,18 +3312,29 @@ class TTSManager {
 
     const language = detectLanguage(text);
 
-    const take = {
-      id: `selected-text-${Date.now()}`,
-      text: text.trim(),
-      language: language,
-      element: null
-    };
+    const chunkedTakes = this.splitTextIntoTakes(text, null, { useCurrentElement: false });
+    if (!chunkedTakes || chunkedTakes.length === 0) {
+      this.warn('There is no text to play.');
+      return;
+    }
 
-    this.preTakes = [take];
-    this.currentPlayList = [take];
+    const takeGroupId = `selected-text-${Date.now()}`;
+    this.preTakes = chunkedTakes.map((chunkTake, index) => ({
+      id: `${takeGroupId}-${index + 1}`,
+      index,
+      text: chunkTake.text,
+      name: `Take ${index + 1}`,
+      language: chunkTake.language || language,
+      element: null,
+      selector: '',
+      audioUrl: null,
+      chunkIndex: index,
+      chunkCount: chunkedTakes.length,
+    }));
+    this.currentPlayList = this.preTakes;
     this.currentTakeIndex = 0;
 
-    await this.startPlaybackFromTake(take);
+    await this.startPlaybackFromTake(this.preTakes[0]);
   }
 
   async startPlaybackFromTake(startTake) {
@@ -5750,13 +5786,14 @@ class TTSManager {
     }, 5000);
   }
 
-  async splitTextIntoTakes(text, elementMetadata = null) {
+  splitTextIntoTakes(text, elementMetadata = null, options = {}) {
     let preprocessedText = text;
     if (window.textPreprocessor) {
       preprocessedText = window.textPreprocessor.preprocess(text);
     }
 
-    const selectedElement = elementMetadata?.domElement || window.ttsSelector?.currentElement;
+    const useCurrentElement = options.useCurrentElement !== false;
+    const selectedElement = elementMetadata?.domElement || (useCurrentElement ? window.ttsSelector?.currentElement : null);
     let targetText = preprocessedText;
 
     if (selectedElement) {
@@ -6183,19 +6220,7 @@ class TTSManager {
   }
 
   getChunkMaxLength(language = null) {
-    if (language === 'ko' || language === 'ja') {
-      return 120;
-    }
-
-    const htmlLang = (document.documentElement.lang || '').toLowerCase();
-    const bodyText = document.body?.textContent || '';
-    const isShortChunkLanguage = htmlLang.startsWith('ko') ||
-                                 htmlLang === 'kr' ||
-                                 htmlLang.startsWith('ja') ||
-                                 bodyText.match(/[\uAC00-\uD7A3]/g)?.length > 50 ||
-                                 bodyText.match(/[\u3040-\u30ff]/g)?.length > 50;
-
-    return isShortChunkLanguage ? 120 : 240;
+    return 120;
   }
 
   needsMultiChunk(text, language) {
@@ -6206,7 +6231,7 @@ class TTSManager {
   smartChunkSplit(text, language) {
     const maxLength = this.getChunkMaxLength(language);
     const preferredMax = maxLength;
-    const hardMax = language === 'ko' || language === 'ja' ? 180 : 320;
+    const hardMax = preferredMax;
     const sentenceParts = text
       .split(/(?<=[.!?。！？])\s+/)
       .map(part => part.trim())
