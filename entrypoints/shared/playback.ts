@@ -1,6 +1,8 @@
 // @ts-nocheck
 
 export function stopAll(manager) {
+  clearSequentialPlaybackTimeout(manager);
+
   if (manager.abortController) {
     manager.abortController.abort();
   }
@@ -29,6 +31,7 @@ export function stopAll(manager) {
   manager.isGenerating = false;
   manager.currentGeneratingTakeId = null;
   manager.currentTakeIndex = 0;
+  manager.pauseResumeTargetIndex = null;
   manager.currentTakeWordElements = [];
   manager.currentTakeWords = [];
   manager.currentPlayList = [];
@@ -63,17 +66,26 @@ export function clearAllAudio(manager) {
 }
 
 export function pausePlayback(manager) {
-  if (manager.isGenerating) {
-    return;
+  if (manager.isGenerating && manager.abortController) {
+    manager.abortController.abort();
+    manager.isGenerating = false;
+    manager.currentGeneratingTakeId = null;
   }
+
+  clearSequentialPlaybackTimeout(manager);
 
   if (manager.currentAudio) {
     manager.currentAudio.pause();
-    manager.isPaused = true;
-    manager.isPlaying = true;
-    manager.updateBottomFloatingUIState();
-    manager.updateStatus('Paused', '#FF9800');
   }
+
+  manager.shouldStopSequentialPlayback = true;
+  const nextIndex = typeof manager.currentTakeIndex === 'number' ? manager.currentTakeIndex + 1 : null;
+  const canResumeNextTake = nextIndex !== null && nextIndex < (manager.currentPlayList?.length || 0);
+  manager.pauseResumeTargetIndex = canResumeNextTake ? nextIndex : null;
+  manager.isPaused = true;
+  manager.isPlaying = true;
+  manager.updateBottomFloatingUIState();
+  manager.updateStatus('Paused', '#FF9800');
 }
 
 export function resumePlayback(manager) {
@@ -85,8 +97,30 @@ export function resumePlayback(manager) {
     manager.currentAudio.play();
     manager.isPaused = false;
     manager.isPlaying = true;
+    manager.shouldStopSequentialPlayback = false;
+    manager.pauseResumeTargetIndex = null;
     manager.updateBottomFloatingUIState();
     manager.updateStatus(`Playing... (${manager.currentPlayListIndex + 1}/${manager.currentPlayList.length})`, '#4CAF50');
+    return;
+  }
+
+  if (manager.isPaused && typeof manager.pauseResumeTargetIndex === 'number') {
+    const resumeIndex = manager.pauseResumeTargetIndex;
+    manager.isPaused = false;
+    manager.isPlaying = true;
+    manager.shouldStopSequentialPlayback = false;
+    manager.pauseResumeTargetIndex = null;
+    manager.updateBottomFloatingUIState();
+    if (typeof manager.playTakeAtIndex === 'function') {
+      void manager.playTakeAtIndex(resumeIndex);
+    }
+  }
+}
+
+function clearSequentialPlaybackTimeout(manager) {
+  if (manager.pendingSequentialPlaybackTimeout) {
+    clearTimeout(manager.pendingSequentialPlaybackTimeout);
+    manager.pendingSequentialPlaybackTimeout = null;
   }
 }
 

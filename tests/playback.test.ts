@@ -33,6 +33,8 @@ function createManager(overrides: ManagerOverrides = {}) {
     audioCache: new Map<string, string>(),
     audioPrefetchPromises: new Map<string, Promise<string | null>>(),
     audioPrefetchQueue: Promise.resolve(),
+    pendingSequentialPlaybackTimeout: null as ReturnType<typeof setTimeout> | null,
+    currentGeneratingTakeId: null as string | null,
     currentPlayList: [{ id: 'take-1', audioUrl: 'blob:one' }],
     currentTakeIndex: 1,
     currentTakeWords: ['hello'],
@@ -135,6 +137,22 @@ test('pause, resume, and stop update playback state', () => {
   assert.equal(manager.isPaused, false);
   assert.equal(manager.currentTakeIndex, 0);
   assert.deepEqual(manager.currentPlayList, []);
+});
+
+test('pause cancels queued sequential playback and aborts generation', () => {
+  const manager = createManager({
+    isGenerating: true,
+    pendingSequentialPlaybackTimeout: setTimeout(() => {}, 1000),
+  });
+
+  pausePlayback(manager);
+
+  assert.equal(manager.isPaused, true);
+  assert.equal(manager.isPlaying, true);
+  assert.equal(manager.isGenerating, false);
+  assert.equal(manager.currentGeneratingTakeId, null);
+  assert.equal(manager.pendingSequentialPlaybackTimeout, null);
+  assert.equal(manager.abortController.signal.aborted, true);
 });
 
 test('clearAllAudio resets cached audio URLs', () => {

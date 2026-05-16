@@ -73,6 +73,8 @@ class TTSManager {
 
     this.preTakes = [];
     this.currentAudio = null;
+    this.pendingSequentialPlaybackTimeout = null;
+    this.pauseResumeTargetIndex = null;
     this.audioCache = new Map();
     this.audioPrefetchPromises = new Map();
     this.audioPrefetchQueue = Promise.resolve();
@@ -3591,7 +3593,13 @@ class TTSManager {
 
         this.cleanupWordTracking();
 
-        setTimeout(async () => {
+        if (this.pendingSequentialPlaybackTimeout) {
+          clearTimeout(this.pendingSequentialPlaybackTimeout);
+          this.pendingSequentialPlaybackTimeout = null;
+        }
+
+        this.pendingSequentialPlaybackTimeout = setTimeout(async () => {
+          this.pendingSequentialPlaybackTimeout = null;
           if (this.isPaused) {
             return;
           }
@@ -6734,7 +6742,13 @@ class TTSManager {
 
         this.stopWordTracking();
 
-        setTimeout(() => {
+        if (this.pendingSequentialPlaybackTimeout) {
+          clearTimeout(this.pendingSequentialPlaybackTimeout);
+          this.pendingSequentialPlaybackTimeout = null;
+        }
+
+        this.pendingSequentialPlaybackTimeout = setTimeout(() => {
+          this.pendingSequentialPlaybackTimeout = null;
           if (this.isPaused) {
             return;
           }
