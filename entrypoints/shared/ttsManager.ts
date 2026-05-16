@@ -5560,10 +5560,6 @@ class TTSManager {
   async handleBottomFloatingButtonClick(event) {
     if (!event) return;
 
-    if (this.isGenerating) {
-      return;
-    }
-
     const targetElement = event.target.closest('[data-action]') || event.target;
     const action = targetElement?.dataset?.action;
 
@@ -5586,6 +5582,10 @@ class TTSManager {
       } else {
         await this.startReadingFromFirst();
       }
+      return;
+    }
+
+    if (this.isGenerating) {
       return;
     }
 
