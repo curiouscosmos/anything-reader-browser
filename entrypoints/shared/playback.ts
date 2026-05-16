@@ -2,6 +2,7 @@
 
 export function stopAll(manager) {
   clearSequentialPlaybackTimeout(manager);
+  clearNextTakeTimeout(manager);
   clearWarmupTimeout(manager);
 
   if (manager.abortController) {
@@ -74,6 +75,7 @@ export function pausePlayback(manager) {
   }
 
   clearSequentialPlaybackTimeout(manager);
+  clearNextTakeTimeout(manager);
   clearWarmupTimeout(manager);
 
   if (manager.currentAudio) {
@@ -123,6 +125,13 @@ function clearSequentialPlaybackTimeout(manager) {
   if (manager.pendingSequentialPlaybackTimeout) {
     clearTimeout(manager.pendingSequentialPlaybackTimeout);
     manager.pendingSequentialPlaybackTimeout = null;
+  }
+}
+
+function clearNextTakeTimeout(manager) {
+  if (manager.pendingNextTakeTimeout) {
+    clearTimeout(manager.pendingNextTakeTimeout);
+    manager.pendingNextTakeTimeout = null;
   }
 }
 

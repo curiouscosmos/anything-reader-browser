@@ -74,6 +74,7 @@ class TTSManager {
     this.preTakes = [];
     this.currentAudio = null;
     this.pendingSequentialPlaybackTimeout = null;
+    this.pendingNextTakeTimeout = null;
     this.pendingWarmupTimeout = null;
     this.pauseResumeTargetIndex = null;
     this.audioCache = new Map();
@@ -6175,6 +6176,10 @@ class TTSManager {
       return;
     }
 
+    if (this.shouldStopSequentialPlayback || this.isPaused) {
+      return;
+    }
+
     if (takeIndex >= this.takes.length) return;
 
     const take = this.takes[takeIndex];
@@ -6818,8 +6823,16 @@ class TTSManager {
             const nextTakeBuffered = this.getFromAudioCache(nextCacheKey);
             const delay = nextTakeBuffered ? 50 : 200;
 
+            if (this.pendingNextTakeTimeout) {
+              clearTimeout(this.pendingNextTakeTimeout);
+              this.pendingNextTakeTimeout = null;
+            }
 
-            setTimeout(() => {
+            this.pendingNextTakeTimeout = setTimeout(() => {
+              this.pendingNextTakeTimeout = null;
+              if (this.shouldStopSequentialPlayback || this.isPaused) {
+                return;
+              }
               this.generateAndPlayTake(this.currentTakeIndex);
             }, delay);
 
