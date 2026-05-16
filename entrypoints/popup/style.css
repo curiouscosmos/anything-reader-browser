@@ -1,3 +1,9 @@
+html {
+  border-radius: 16px;
+  overflow: hidden;
+  background: #f7f8fa;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -8,6 +14,8 @@ body {
   color: #202124;
   background: #f7f8fa;
   font: 13px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 .popup-shell {
@@ -15,6 +23,7 @@ body {
   flex-direction: column;
   gap: 12px;
   padding: 14px;
+  background: #f7f8fa;
 }
 
 .popup-header {
