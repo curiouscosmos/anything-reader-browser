@@ -61,9 +61,9 @@ export function createPlayerDock(manager: PlayerDockManager) {
     left: auto !important;
     bottom: auto !important;
     transform: translateY(-50%) !important;
-    width: 75px !important;
-    min-width: 75px !important;
-    max-width: 75px !important;
+    width: 50px !important;
+    min-width: 50px !important;
+    max-width: 50px !important;
     z-index: 2147483637 !important;
     padding: 8px 6px !important;
     margin: 0 !important;
@@ -74,7 +74,7 @@ export function createPlayerDock(manager: PlayerDockManager) {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
     display: none !important;
     border: 1px solid ${borderColor} !important;
-    border-radius: 14px !important;
+    border-radius: 8px !important;
     cursor: default !important;
     user-select: none !important;
     transition: all 0.3s ease !important;
@@ -151,6 +151,7 @@ export function createPlayerDock(manager: PlayerDockManager) {
     padding: 0 4px !important;
     box-sizing: border-box !important;
   `;
+  voiceSelect.dataset.playerDockControl = 'true';
 
   const speedSelect = document.createElement('select');
   speedSelect.style.cssText = `
@@ -168,6 +169,7 @@ export function createPlayerDock(manager: PlayerDockManager) {
     padding: 0 4px !important;
     box-sizing: border-box !important;
   `;
+  speedSelect.dataset.playerDockControl = 'true';
 
   const playButton = document.createElement('button');
   playButton.type = 'button';
@@ -227,7 +229,14 @@ export function createPlayerDock(manager: PlayerDockManager) {
   populatePlayerDockSpeedSelect(manager);
   updatePlayerDockTheme(manager);
   updatePlayerDockState(manager);
+  updatePlayerDockVisibility(manager);
   setupPlayerDockDrag(manager);
+
+  manager.bottomFloatingUI.style.left = '';
+  manager.bottomFloatingUI.style.top = '';
+  manager.bottomFloatingUI.style.right = '20px';
+  manager.bottomFloatingUI.style.bottom = 'auto';
+  manager.bottomFloatingUI.style.transform = 'translateY(-50%)';
 
   logoWrap.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -294,6 +303,8 @@ export function updatePlayerDockTheme(manager: PlayerDockManager) {
     manager.speedSelect.style.color = textColor;
     manager.speedSelect.style.borderColor = borderColor;
   }
+
+  updatePlayerDockVisibility(manager);
 }
 
 export function populatePlayerDockVoiceSelect(manager: PlayerDockManager) {
@@ -367,6 +378,7 @@ export function updatePlayerDockState(manager: PlayerDockManager) {
   manager.bottomFloatingButton.disabled = false;
   manager.bottomFloatingButton.style.cursor = 'pointer';
   manager.bottomFloatingButton.style.opacity = manager.isPageReadError ? '0.6' : '1';
+  updatePlayerDockVisibility(manager);
 }
 
 export function getPlayerDockState(manager: PlayerDockManager) {
@@ -428,14 +440,16 @@ export function restorePlayerDockState(
 
   const originalTransition = manager.bottomFloatingUI.style.transition;
   manager.bottomFloatingUI.style.transition = 'none';
-  manager.bottomFloatingUI.style.left = `${state.position?.left ?? window.innerWidth - 144}px`;
+  manager.bottomFloatingUI.style.left = `${state.position?.left ?? window.innerWidth - 70}px`;
   manager.bottomFloatingUI.style.top = `${state.position?.top ?? Math.max(20, Math.min((window.innerHeight / 2) - 94, window.innerHeight - 220))}px`;
   manager.bottomFloatingUI.style.right = 'auto';
   manager.bottomFloatingUI.style.bottom = 'auto';
   manager.bottomFloatingUI.style.transform = 'none';
-  manager.bottomFloatingUI.style.width = `${state.width ?? 124}px`;
-  manager.bottomFloatingUI.style.padding = '10px 8px';
-  manager.bottomFloatingUI.style.borderRadius = '14px';
+  manager.bottomFloatingUI.style.width = `${state.width ?? 50}px`;
+  manager.bottomFloatingUI.style.minWidth = `${state.width ?? 50}px`;
+  manager.bottomFloatingUI.style.maxWidth = `${state.width ?? 50}px`;
+  manager.bottomFloatingUI.style.padding = '8px 6px';
+  manager.bottomFloatingUI.style.borderRadius = '8px';
 
   setTimeout(() => {
     if (manager.bottomFloatingUI) {
@@ -507,4 +521,20 @@ function setupPlayerDockDrag(manager: PlayerDockManager) {
   manager.bottomFloatingUI.addEventListener('mousedown', handleMouseDown);
   document.addEventListener('mousemove', handleMouseMove);
   document.addEventListener('mouseup', handleMouseUp);
+}
+
+function updatePlayerDockVisibility(manager: PlayerDockManager) {
+  if (!manager.bottomFloatingUI || !manager.voiceSelect || !manager.speedSelect) return;
+
+  const shouldShowControls = manager.isPlaying && !manager.isPaused;
+  manager.voiceSelect.style.display = shouldShowControls ? 'block' : 'none';
+  manager.speedSelect.style.display = shouldShowControls ? 'block' : 'none';
+  const dockWidth = shouldShowControls ? '75px' : '50px';
+  manager.bottomFloatingUI.style.width = dockWidth;
+  manager.bottomFloatingUI.style.minWidth = dockWidth;
+  manager.bottomFloatingUI.style.maxWidth = dockWidth;
+  manager.bottomFloatingUI.style.right = '20px';
+  if (!manager.bottomFloatingUI.style.left) {
+    manager.bottomFloatingUI.style.top = `${Math.max(20, window.innerHeight - 220)}px`;
+  }
 }
