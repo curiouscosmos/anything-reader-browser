@@ -1553,21 +1553,6 @@ class TTSManager {
   }
 
   restoreInfoElementsForSnap() {
-    const arText = document.getElementById('tts-ar-text');
-    if (arText) {
-      arText.style.display = '';
-    }
-
-    const rightContainer = document.getElementById('tts-right-container');
-    if (rightContainer) {
-      rightContainer.style.display = 'flex';
-    }
-
-    const tinyUIReaderButton = document.getElementById('tts-tiny-ui-reader-button');
-    if (tinyUIReaderButton) {
-      tinyUIReaderButton.style.display = 'none';
-    }
-
     if (this.isPageReadError) {
       this.updatePageReadError();
     } else {
@@ -1576,32 +1561,6 @@ class TTSManager {
   }
 
   applyTinyUI() {
-    if (!this.bottomFloatingUI) return;
-    if (!this.isMiddleFloating) return;
-
-    const currentLeft = parseInt(this.bottomFloatingUI.style.left) || 0;
-    const currentWidth = parseInt(this.bottomFloatingUI.style.width) || 700;
-    const widthDiff = currentWidth - 230;
-    const newLeft = currentLeft + (widthDiff / 2);
-
-    this.bottomFloatingUI.style.width = '230px';
-    this.bottomFloatingUI.style.left = `${newLeft}px`;
-
-    const arText = document.getElementById('tts-ar-text');
-    if (arText) {
-      arText.style.display = 'none';
-    }
-
-    const rightContainer = document.getElementById('tts-right-container');
-    if (rightContainer) {
-      rightContainer.style.display = 'none';
-    }
-
-    const tinyUIReaderButton = document.getElementById('tts-tiny-ui-reader-button');
-    if (tinyUIReaderButton) {
-      tinyUIReaderButton.style.display = 'flex';
-    }
-
     if (this.isPageReadError) {
       this.updatePageReadError();
     } else {
@@ -1610,32 +1569,6 @@ class TTSManager {
   }
 
   restoreTinyUI() {
-    if (!this.bottomFloatingUI) return;
-    if (!this.isMiddleFloating) return;
-
-    const currentLeft = parseInt(this.bottomFloatingUI.style.left) || 0;
-    const currentWidth = parseInt(this.bottomFloatingUI.style.width) || 230;
-    const widthDiff = 700 - currentWidth;
-    const newLeft = currentLeft - (widthDiff / 2);
-
-    this.bottomFloatingUI.style.width = '700px';
-    this.bottomFloatingUI.style.left = `${newLeft}px`;
-
-    const arText = document.getElementById('tts-ar-text');
-    if (arText) {
-      arText.style.display = '';
-    }
-
-    const rightContainer = document.getElementById('tts-right-container');
-    if (rightContainer) {
-      rightContainer.style.display = 'flex';
-    }
-
-    const tinyUIReaderButton = document.getElementById('tts-tiny-ui-reader-button');
-    if (tinyUIReaderButton) {
-      tinyUIReaderButton.style.display = 'none';
-    }
-
     if (this.isPageReadError) {
       this.updatePageReadError();
     } else {
@@ -1645,57 +1578,8 @@ class TTSManager {
 
   updateTinyUI() {
     if (!this.bottomFloatingUI) return;
-
-    const currentBottom = parseInt(this.bottomFloatingUI.style.bottom) || 0;
-    const currentLeft = parseInt(this.bottomFloatingUI.style.left) || 0;
-    const currentWidth = this.bottomFloatingUI.style.width || '';
-    const currentTransform = this.bottomFloatingUI.style.transform || '';
-    const maxBottom = window.innerHeight - 40;
-
-
-    const isBottomSnap = currentBottom === 0;
-    const isTopSnap = currentBottom >= maxBottom - 10;
-    const isLeftRotateSnap = currentLeft === 40 && currentTransform.includes('rotate(90deg)');
-    const isRightRotateSnap = currentLeft === window.innerWidth - 40 && currentTransform.includes('rotate(-90deg)');
-    const isVerticalSnap = currentWidth === '100%';
-    const isHorizontalSnap = currentWidth === '100vh';
-    const isRotated = currentTransform.includes('rotate') && !currentTransform.includes('rotate(0deg)');
-
-    const isSnapped = isBottomSnap ||
-                      isTopSnap ||
-                      isLeftRotateSnap ||
-                      isRightRotateSnap ||
-                      isVerticalSnap ||
-                      isHorizontalSnap ||
-                      isRotated;
-
-    this.isMiddleFloating = !isSnapped;
-
-    if (this.isMiddleFloating && this.bottomFloatingUI.style.left === '50%') {
-      const currentWidth = parseInt(this.bottomFloatingUI.style.width) || 700;
-      const centerX = (window.innerWidth / 2) - (currentWidth / 2);
-      this.bottomFloatingUI.style.left = `${centerX}px`;
-      this.bottomFloatingUI.style.transform = 'none';
-    }
-
-    if (this.isMiddleFloating && this.tinyUIEnabled) {
-      this.applyTinyUI();
-    } else {
-      this.restoreTinyUI();
-    }
-
-    const tinyUIReaderButton = document.getElementById('tts-tiny-ui-reader-button');
-    if (tinyUIReaderButton) {
-      if (this.isMiddleFloating && this.tinyUIEnabled) {
-        tinyUIReaderButton.style.display = 'flex';
-      } else {
-        tinyUIReaderButton.style.display = 'none';
-      }
-    }
-
-    if (this.isPageReadError) {
-      this.updatePageReadError();
-    }
+    this.isMiddleFloating = true;
+    this.updateBottomFloatingUIState();
   }
 
   async saveFloatingBarVisibilitySetting(enabled) {
@@ -1716,59 +1600,15 @@ class TTSManager {
   getFloatingBarState() {
     if (!this.bottomFloatingUI) return null;
 
-    let currentLeft = parseInt(this.bottomFloatingUI.style.left) || 0;
-    if (this.bottomFloatingUI.style.left === '50%') {
-      const currentWidth = parseInt(this.bottomFloatingUI.style.width) || 700;
-      currentLeft = (window.innerWidth / 2) - (currentWidth / 2);
-    }
-
-    const currentBottom = parseInt(this.bottomFloatingUI.style.bottom) || 0;
-    const currentWidth = this.bottomFloatingUI.style.width;
-    const currentTransform = this.bottomFloatingUI.style.transform || '';
-    const maxBottom = window.innerHeight - 40;
-    const snapZone = 10;
-
-    const isBottomSnap = currentBottom === 0;
-    const isTopSnap = currentBottom >= maxBottom - snapZone;
-    const isLeftRotateSnap = currentLeft === 40 && currentTransform.includes('rotate(90deg)');
-    const isRightRotateSnap = currentLeft === window.innerWidth - 40 && currentTransform.includes('rotate(-90deg)');
-    const isVerticalSnap = currentWidth === '100%';
-    const isHorizontalSnap = currentWidth === '100vh';
-    const isRotated = currentTransform.includes('rotate') && !currentTransform.includes('rotate(0deg)');
-
-    const isSnapped = isBottomSnap ||
-                      isTopSnap ||
-                      isLeftRotateSnap ||
-                      isRightRotateSnap ||
-                      isVerticalSnap ||
-                      isHorizontalSnap ||
-                      isRotated;
-
-    let snapState = 'middle';
-    if (isBottomSnap && isVerticalSnap) {
-      snapState = 'bottom';
-    } else if (isTopSnap && isVerticalSnap) {
-      snapState = 'top';
-    } else if (isLeftRotateSnap) {
-      snapState = 'left';
-    } else if (isRightRotateSnap) {
-      snapState = 'right';
-    }
-
-    const state = {
-      snapState: snapState
+    const rect = this.bottomFloatingUI.getBoundingClientRect();
+    return {
+      position: {
+        left: Math.round(rect.left),
+        top: Math.round(rect.top),
+      },
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
     };
-
-    if (snapState === 'middle' && !isSnapped) {
-      const width = parseInt(currentWidth) || 700;
-      state.position = {
-        left: currentLeft,
-        bottom: currentBottom
-      };
-      state.width = width;
-    }
-
-    return state;
   }
 
   async saveFloatingBarState() {
@@ -1836,82 +1676,21 @@ class TTSManager {
     const originalTransition = this.bottomFloatingUI.style.transition;
     this.bottomFloatingUI.style.transition = 'none';
 
-    if (state.snapState === 'bottom') {
-      this.bottomFloatingUI.style.left = '0px';
-      this.bottomFloatingUI.style.bottom = '0px';
-      this.bottomFloatingUI.style.top = 'auto';
-      this.bottomFloatingUI.style.width = '100%';
-      this.bottomFloatingUI.style.transform = 'rotate(0deg)';
-      this.bottomFloatingUI.style.transformOrigin = 'center center';
-      this.bottomFloatingUI.style.padding = '0';
-      this.bottomFloatingUI.style.borderRadius = '0';
-      this.updateFloatingBarBorder('bottom');
-      this.isMiddleFloating = false;
-      this.restoreInfoElementsForSnap();
-    } else if (state.snapState === 'top') {
-      const maxBottom = window.innerHeight - 40;
-      this.bottomFloatingUI.style.left = '0px';
-      this.bottomFloatingUI.style.bottom = `${maxBottom}px`;
-      this.bottomFloatingUI.style.top = 'auto';
-      this.bottomFloatingUI.style.width = '100%';
-      this.bottomFloatingUI.style.transform = 'rotate(0deg)';
-      this.bottomFloatingUI.style.transformOrigin = 'center center';
-      this.bottomFloatingUI.style.padding = '0';
-      this.bottomFloatingUI.style.borderRadius = '0';
-      this.updateFloatingBarBorder('top');
-      this.isMiddleFloating = false;
-      this.restoreInfoElementsForSnap();
-    } else if (state.snapState === 'left') {
-      this.bottomFloatingUI.style.transformOrigin = '0 0';
-      this.bottomFloatingUI.style.transform = 'rotate(90deg)';
-      this.bottomFloatingUI.style.left = '40px';
-      this.bottomFloatingUI.style.bottom = 'auto';
-      this.bottomFloatingUI.style.top = '0%';
-      this.bottomFloatingUI.style.width = '100vh';
-      this.bottomFloatingUI.style.padding = '0';
-      this.bottomFloatingUI.style.borderRadius = '0';
-      this.updateFloatingBarBorder('left');
-      this.isMiddleFloating = false;
-      this.restoreInfoElementsForSnap();
-    } else if (state.snapState === 'right') {
-      this.bottomFloatingUI.style.transformOrigin = '0 0';
-      this.bottomFloatingUI.style.transform = 'rotate(-90deg)';
-      this.bottomFloatingUI.style.left = `${window.innerWidth - 40}px`;
-      this.bottomFloatingUI.style.bottom = 'auto';
-      this.bottomFloatingUI.style.top = '100%';
-      this.bottomFloatingUI.style.width = '100vh';
-      this.bottomFloatingUI.style.padding = '0';
-      this.bottomFloatingUI.style.borderRadius = '0';
-      this.updateFloatingBarBorder('right');
-      this.isMiddleFloating = false;
-      this.restoreInfoElementsForSnap();
-    } else if (state.snapState === 'middle' && state.position && state.width) {
-      this.isMiddleFloating = true;
-      this.bottomFloatingUI.style.left = `${state.position.left}px`;
-      this.bottomFloatingUI.style.bottom = `${state.position.bottom}px`;
-      this.bottomFloatingUI.style.top = 'auto';
-      this.bottomFloatingUI.style.width = `${state.width}px`;
-      this.bottomFloatingUI.style.transform = 'rotate(0deg)';
-      this.bottomFloatingUI.style.transformOrigin = 'center center';
-      this.bottomFloatingUI.style.padding = '4px';
-      this.bottomFloatingUI.style.borderRadius = '5px';
-      this.updateFloatingBarBorder('middle');
+    const left = typeof state.position?.left === 'number' ? state.position.left : window.innerWidth - 144;
+    const top = typeof state.position?.top === 'number'
+      ? state.position.top
+      : Math.max(20, Math.min((window.innerHeight / 2) - 94, window.innerHeight - 220));
 
-      if (state.width === 230 && this.tinyUIEnabled) {
-        this.applyTinyUI();
-      } else {
-        this.restoreTinyUI();
-      }
-
-      const tinyUIReaderButton = document.getElementById('tts-tiny-ui-reader-button');
-      if (tinyUIReaderButton) {
-        if (this.isMiddleFloating && this.tinyUIEnabled) {
-          tinyUIReaderButton.style.display = 'flex';
-        } else {
-          tinyUIReaderButton.style.display = 'none';
-        }
-      }
-    }
+    this.bottomFloatingUI.style.left = `${left}px`;
+    this.bottomFloatingUI.style.top = `${top}px`;
+    this.bottomFloatingUI.style.right = 'auto';
+    this.bottomFloatingUI.style.bottom = 'auto';
+    this.bottomFloatingUI.style.transform = 'none';
+    this.bottomFloatingUI.style.width = '124px';
+    this.bottomFloatingUI.style.padding = '10px 8px';
+    this.bottomFloatingUI.style.borderRadius = '14px';
+    this.bottomFloatingUI.style.transformOrigin = 'center center';
+    this.isMiddleFloating = true;
 
     setTimeout(() => {
       this.bottomFloatingUI.style.transition = originalTransition;
@@ -5859,78 +5638,43 @@ class TTSManager {
     this.bottomFloatingUI.style.color = textColor;
 
     if (this.bottomFloatingButton) {
-      this.bottomFloatingButton.style.background = 'transparent';
+      this.bottomFloatingButton.style.background = 'rgba(255, 255, 255, 0.08)';
       this.bottomFloatingButton.style.color = textColor;
       this.bottomFloatingButton.style.textAlign = 'center';
       this.bottomFloatingButton.style.textDecoration = 'none';
+      this.bottomFloatingButton.style.borderColor = borderColor;
     }
 
-    if (this.readerButton) {
-      this.readerButton.style.background = 'transparent';
-      this.readerButton.style.color = textColor;
-      this.readerButton.style.textDecoration = 'none';
+    if (this.voiceSelect) {
+      this.voiceSelect.style.background = 'rgba(255, 255, 255, 0.08)';
+      this.voiceSelect.style.color = textColor;
+      this.voiceSelect.style.borderColor = borderColor;
     }
 
-    const tinyUIReaderButton = document.getElementById('tts-tiny-ui-reader-button');
-    if (tinyUIReaderButton) {
-      tinyUIReaderButton.style.background = 'transparent';
-      tinyUIReaderButton.style.color = textColor;
-      tinyUIReaderButton.style.textDecoration = 'none';
+    if (this.speedSelect) {
+      this.speedSelect.style.background = 'rgba(255, 255, 255, 0.08)';
+      this.speedSelect.style.color = textColor;
+      this.speedSelect.style.borderColor = borderColor;
     }
 
-    if (this.randomNavigateButton) {
-      this.randomNavigateButton.style.background = 'transparent';
-      this.randomNavigateButton.style.color = textColor;
-      this.randomNavigateButton.style.textDecoration = 'none';
+    if (this.moveHandle) {
+      this.moveHandle.style.cursor = 'grab';
     }
 
-    if (this.refreshButton) {
-      this.refreshButton.style.background = 'transparent';
-      this.refreshButton.style.color = textColor;
-      this.refreshButton.style.textDecoration = 'none';
+    if (this.floatingLogo) {
+      this.floatingLogo.style.cursor = 'default';
     }
 
-    const handlerIcon = document.getElementById('tts-handler-icon');
-    if (handlerIcon) {
-      const handlerColor = this.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : '#1d1d1d';
-      handlerIcon.innerHTML = `
-        <svg width="8" height="14" viewBox="0 0 8 14" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 8px; height: 14px;">
-          <circle cx="2" cy="2" r="1" fill="${handlerColor}"/>
-          <circle cx="6" cy="2" r="1" fill="${handlerColor}"/>
-          <circle cx="2" cy="7" r="1" fill="${handlerColor}"/>
-          <circle cx="6" cy="7" r="1" fill="${handlerColor}"/>
-          <circle cx="2" cy="12" r="1" fill="${handlerColor}"/>
-          <circle cx="6" cy="12" r="1" fill="${handlerColor}"/>
-        </svg>
-      `;
-    }
-
-    if (this.bottomTakeCountLabel) {
-      this.bottomTakeCountLabel.style.color = textColor;
-    }
-
-    const arText = document.getElementById('tts-ar-text');
-    if (arText) {
-      arText.style.color = textColor;
-    }
-
-    if (this.bottomFloatingUI) {
-      const currentBottom = parseInt(this.bottomFloatingUI.style.bottom) || 0;
-      const currentTransform = this.bottomFloatingUI.style.transform || '';
-
-      if (currentTransform.includes('rotate(90deg)')) {
-        this.updateFloatingBarBorder('left');
-      } else if (currentTransform.includes('rotate(-90deg)')) {
-        this.updateFloatingBarBorder('right');
-      } else if (currentBottom === 0) {
-        this.updateFloatingBarBorder('bottom');
-      } else if (currentBottom >= window.innerHeight - 40) {
-        this.updateFloatingBarBorder('top');
-      } else {
-        this.updateFloatingBarBorder('middle');
+    if (this.floatingLogo) {
+      const logoImg = this.floatingLogo.querySelector('img');
+      if (logoImg) {
+        logoImg.style.opacity = '1';
       }
     }
 
+    if (this.bottomFloatingUI) {
+      this.bottomFloatingUI.style.borderColor = borderColor;
+    }
 
     this.updateBottomFloatingUIState();
   }
@@ -5964,12 +5708,16 @@ class TTSManager {
     this.bottomFloatingUI.id = 'tts-bottom-floating-ui';
     this.bottomFloatingUI.style.cssText = `
       position: fixed !important;
-      left: 50% !important;
-      bottom: 30px !important;
-      transform: translateX(-50%) !important;
-      width: 700px !important;
+      top: 50% !important;
+      right: 20px !important;
+      left: auto !important;
+      bottom: auto !important;
+      transform: translateY(-50%) !important;
+      width: 124px !important;
+      min-width: 124px !important;
+      max-width: 124px !important;
       z-index: 2147483637 !important;
-      padding: 4px !important;
+      padding: 10px 8px !important;
       margin: 0 !important;
       background: ${bgColor} !important;
       backdrop-filter: blur(10px) !important;
@@ -5977,31 +5725,49 @@ class TTSManager {
       color: ${textColor} !important;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
       display: none !important;
-      border: none !important;
-      border-radius: 5px !important;
-      cursor: grab !important;
+      border: 1px solid ${borderColor} !important;
+      border-radius: 14px !important;
+      cursor: default !important;
       user-select: none !important;
       transition: all 0.3s ease !important;
+      box-sizing: border-box !important;
     `;
 
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.cssText = `
+    const dock = document.createElement('div');
+    dock.style.cssText = `
       width: 100% !important;
-      height: 40px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: 8px !important;
+      padding: 0 !important;
+      box-sizing: border-box !important;
+    `;
+
+    const headerRow = document.createElement('div');
+    headerRow.style.cssText = `
       display: flex !important;
       align-items: center !important;
       justify-content: space-between !important;
-      padding: 0px 6px 0px 16px !important;
+      gap: 10px !important;
+      width: 100% !important;
       box-sizing: border-box !important;
-      flex-wrap: nowrap !important;
-      position: relative !important;
     `;
 
-    const leftContainer = document.createElement('div');
-    leftContainer.style.cssText = `
+    const logoWrap = document.createElement('button');
+    logoWrap.type = 'button';
+    logoWrap.title = 'Anything Reader';
+    logoWrap.setAttribute('aria-label', 'Anything Reader');
+    logoWrap.style.cssText = `
+      appearance: none !important;
+      background: transparent !important;
+      border: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
       display: flex !important;
       align-items: center !important;
-      gap: 8px !important;
+      justify-content: center !important;
+      cursor: default !important;
       flex-shrink: 0 !important;
     `;
 
@@ -6010,274 +5776,39 @@ class TTSManager {
     svgIcon.alt = 'Anything Reader';
     svgIcon.style.cssText = `
       pointer-events: auto !important;
-      cursor: pointer !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
-      width: 20px !important;
-      height: 20px !important;
-      object-fit: contain !important;
-      border-radius: 4px !important;
-    `;
-
-    const arText = document.createElement('div');
-    arText.id = 'tts-ar-text';
-    arText.style.cssText = `
-      color: ${textColor} !important;
-      font-size: calc(${this.UI_FONT_SIZE} * 0.6) !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      white-space: nowrap !important;
-      flex-shrink: 0 !important;
-      z-index: 1 !important;
-      text-align: left !important;
-    `;
-
-    arText.textContent = 'Anything Reader';
-
-    leftContainer.appendChild(svgIcon);
-    leftContainer.appendChild(arText);
-
-    svgIcon.addEventListener('click', (event) => {
-      event.stopPropagation();
-      window.open('https://supertone.ai/', '_blank');
-    });
-
-    this.bottomFloatingButton = document.createElement('button');
-    this.bottomFloatingButton.style.cssText = `
-      position: absolute !important;
-      left: 50% !important;
-      top: 50% !important;
-      transform: translate(-50%, -50%) !important;
-      height: 40px !important;
-      background: transparent !important;
-      color: ${textColor} !important;
-      border: 0 !important;
-      box-shadow: none !important;
-      font-size: ${this.UI_FONT_SIZE} !important;
-      font-weight: normal !important;
-      text-transform: none !important;
-      cursor: pointer !important;
-      transition: all 0.3s !important;
-      font-family: inherit !important;
-      outline: none !important;
-      padding: 0 8px !important;
-      margin: 0 !important;
-      text-align: center !important;
-      white-space: nowrap !important;
-      z-index: 1 !important;
-      text-decoration: none !important;
-    `;
-
-
-    this.readerButton = document.createElement('button');
-    this.readerButton.innerHTML = 'Aa';
-    this.readerButton.style.cssText = `
-      background: transparent !important;
-      color: ${textColor} !important;
-      border: 0 !important;
-      font-size: calc(${this.UI_FONT_SIZE} - 2px) !important;
-      font-weight: 600 !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      cursor: pointer !important;
-      transition: all 0.3s !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      margin-top: -1px !important;
-      padding: 0 !important;
-      outline: none !important;
-      box-sizing: border-box !important;
-      flex-shrink: 0 !important;
-      z-index: 1 !important;
-      text-decoration: none !important;
-      width: 16px !important;
-      min-width: 16px !important;
-    `;
-
-    this.readerButton.addEventListener('click', (event) => {
-      event.stopPropagation();
-      this.openReaderPage();
-    });
-
-    this.randomNavigateButton = document.createElement('button');
-    this.randomNavigateButton.innerHTML = '✈︎';
-    this.randomNavigateButton.style.cssText = `
-      background: transparent !important;
-      color: ${textColor} !important;
-      border: 0 !important;
-      font-size: ${this.UI_FONT_SIZE} !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      cursor: pointer !important;
-      transition: all 0.3s !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      margin-top: -1px !important;
-      padding: 0 !important;
-      outline: none !important;
-      box-sizing: border-box !important;
-      flex-shrink: 0 !important;
-      z-index: 1 !important;
-      text-decoration: none !important;
-      transform: rotate(-45deg) !important;
-      width: 16px !important;
-      min-width: 16px !important;
-    `;
-
-    this.randomNavigateButton.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const randomUrls = [
-        'https://edition.cnn.com/2021/10/03/asia/north-korea-south-korea-intl',
-        'https://www.bbc.com/culture/article/20250723-how-psychos-terrifying-music-changed-film-forever',
-        'https://www.nytimes.com/2025/12/17/style/tiny-modern-love-stories-good-riddance-christmas.html',
-        'https://www.theguardian.com/music/ng-interactive/2025/dec/08/the-best-albums-of-2025-50-41',
-        'https://www.reuters.com/graphics/MYANMAR-QUAKE/SUPERSHEAR/zgvojlyojpd/',
-        'https://www.economist.com/the-world-ahead/2025/11/10/tom-standages-ten-trends-to-watch-in-2026',
-        'https://www.newyorker.com/culture/on-and-off-the-avenue/holiday-gift-guide-2025-coffee',
-        'https://www.lrb.co.uk/the-paper/v35/n09/richard-lloyd-parry/advantage-pyongyang',
-        'https://aeon.co/essays/i-am-witness-to-the-strength-of-working-women-in-afghanistan',
-        'https://nautil.us/how-to-measure-the-universe-1235873/',
-        'https://www.smithsonianmag.com/science-nature/nations-biggest-animal-sanctuary-operates-under-mantra-save-them-all-how-controversial-180987638/',
-        'https://www.wired.com/story/how-k-pop-demon-hunters-star-ejae-topped-the-charts/',
-        'https://www.wired.com/story/artificial-intelligence-drug-discovery/',
-        'https://techcrunch.com/2025/12/17/bluesky-launches-a-privacy-focused-find-friends-feature-without-invite-spam/',
-        'https://arstechnica.com/gaming/2025/12/after-40-years-of-adventure-games-ron-gilbert-pivots-to-outrunning-death/',
-        'https://stratechery.com/2021/the-roblox-microverse/',
-        'https://en.wikipedia.org/wiki/Speech_synthesis',
-        'https://www.britannica.com/place/South-Korea',
-        'https://plato.stanford.edu/entries/artificial-intelligence/',
-        'https://www.tmz.com/2024/08/27/oasis-reunion-confirmed-liam-noel-gallagher/',
-        'https://people.com/dinosaur-footprints-discovered-near-2026-winter-olympics-venues-11870932',
-        'https://www.buzzfeednews.com/article/stephaniesoteriou/zendaya-tom-holland-first-text-emmys-win?origin=fil-ze',
-        'https://waitbutwhy.com/2017/04/neuralink.html',
-        'https://www.spacex.com/',
-        'https://ourworldindata.org/top-of-the-charts-2025',
-        'https://www.the-reader.or.kr/fo/month/classic/detail?mgbiId=69',
-        'https://brunch.co.kr/@soundfoundrynco/114',
-        'https://www.liberation.fr/societe/moi-jeune-et-chatgpt-il-repond-toujours-a-la-seconde-sans-me-juger-20260107_X57D3JD3MJCEBNW2CFIHZQ27UE/',
-        'https://laviedesidees.fr/Peindre-le-sommeil',
-        'https://www.lesinrocks.com/musique/que-faisait-david-bowie-a-votre-age-687076-07-01-2026/',
-        'https://www.gutenberg.org/cache/epub/84/pg84-images.html',
-        'https://www.gutenberg.org/cache/epub/2701/pg2701-images.html',
-        'https://www.gutenberg.org/cache/epub/11/pg11-images.html',
-        'https://www.gutenberg.org/cache/epub/2000/pg2000-images.html',
-        'https://www.gutenberg.org/cache/epub/58221/pg58221-images.html',
-        'https://www.gutenberg.org/cache/epub/26110/pg26110-images.html',
-        'https://www.gutenberg.org/cache/epub/46183/pg46183-images.html',
-        'https://www.gutenberg.org/cache/epub/17489/pg17489-images.html',
-        'https://workroompress.kr/product/215129/',
-        'https://workroompress.kr/product/215075/'
-      ];
-      const randomUrl = randomUrls[Math.floor(Math.random() * randomUrls.length)];
-      window.location.href = randomUrl;
-    });
-
-    this.bottomTakeCountLabel = document.createElement('div');
-    this.bottomTakeCountLabel.id = 'tts-bottom-take-count';
-    this.bottomTakeCountLabel.style.cssText = `
-      color: ${textColor} !important;
-      font-size: calc(${this.UI_FONT_SIZE} * 0.6) !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      margin-right: 0px !important;
-      white-space: nowrap !important;
-      flex-shrink: 0 !important;
-      z-index: 1 !important;
-      text-align: right !important;
-    `;
-    this.bottomTakeCountLabel.textContent = '0 ¶';
-
-    this.refreshButton = document.createElement('button');
-    this.refreshButton.innerHTML = '<span class="refresh-icon">↺</span>';
-    this.refreshButton.style.cssText = `
       width: 24px !important;
-      height: 40px !important;
-      min-width: 24px !important;
-      max-width: 24px !important;
+      height: 24px !important;
+      object-fit: contain !important;
+      border-radius: 6px !important;
+    `;
+
+    logoWrap.appendChild(svgIcon);
+
+    this.moveHandle = document.createElement('button');
+    this.moveHandle.type = 'button';
+    this.moveHandle.title = 'Move';
+    this.moveHandle.setAttribute('aria-label', 'Move player');
+    this.moveHandle.style.cssText = `
+      appearance: none !important;
       background: transparent !important;
-      color: ${textColor} !important;
       border: 0 !important;
-      font-size: ${this.UI_FONT_SIZE} !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      cursor: pointer !important;
-      transition: all 0.3s !important;
+      padding: 0 !important;
+      margin: 0 !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
-      margin-top: -1px !important;
-      padding: 0 !important;
-      outline: none !important;
-      box-sizing: border-box !important;
+      cursor: grab !important;
       flex-shrink: 0 !important;
-      z-index: 1 !important;
-      text-decoration: none !important;
+      width: 18px !important;
+      height: 18px !important;
     `;
 
-    if (this.refreshButton) {
-      this.refreshButton.addEventListener('click', (event) => {
-        event.stopPropagation();
-        this.handleRefreshButtonClick();
-      });
-    }
-
-    buttonContainer.appendChild(leftContainer);
-
-    const rightContainer = document.createElement('div');
-    rightContainer.id = 'tts-right-container';
-    rightContainer.style.cssText = `
-      display: flex !important;
-      align-items: center !important;
-      gap: 7px !important;
-      flex-shrink: 0 !important;
-      margin-right: 20px !important;
-    `;
-    rightContainer.appendChild(this.readerButton);
-    rightContainer.appendChild(this.randomNavigateButton);
-    rightContainer.appendChild(this.bottomTakeCountLabel);
-    rightContainer.appendChild(this.refreshButton);
-
-    buttonContainer.appendChild(rightContainer);
-    buttonContainer.appendChild(this.bottomFloatingButton);
-
-    const tinyUIReaderButton = document.createElement('button');
-    tinyUIReaderButton.id = 'tts-tiny-ui-reader-button';
-    tinyUIReaderButton.innerHTML = 'Aa';
-    tinyUIReaderButton.style.cssText = `
-      background: transparent !important;
-      color: ${textColor} !important;
-      border: 0 !important;
-      font-size: calc(${this.UI_FONT_SIZE} - 2px) !important;
-      font-weight: 600 !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      cursor: pointer !important;
-      transition: all 0.3s !important;
-      display: none !important;
-      align-items: center !important;
-      justify-content: center !important;
-      margin-top: -1px !important;
-      padding: 0 !important;
-      outline: none !important;
-      box-sizing: border-box !important;
-      flex-shrink: 0 !important;
-      z-index: 1 !important;
-      text-decoration: none !important;
-      width: 16px !important;
-      min-width: 16px !important;
-      position: absolute !important;
-      right: 26px !important;
-      top: 50% !important;
-      transform: translateY(-50%) !important;
-    `;
-    tinyUIReaderButton.addEventListener('click', (event) => {
-      event.stopPropagation();
-      this.openReaderPage();
-    });
-    buttonContainer.appendChild(tinyUIReaderButton);
-
-    const handlerIcon = document.createElement('div');
-    handlerIcon.id = 'tts-handler-icon';
-    const handlerColor = this.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : '#1d1d1d';
-    handlerIcon.innerHTML = `
-      <svg width="8" height="14" viewBox="0 0 8 14" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 8px; height: 14px;">
+    const handlerColor = this.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : '#1d1d1d';
+    this.moveHandle.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 8 14" xmlns="http://www.w3.org/2000/svg" style="display:block; width:14px; height:14px;">
         <circle cx="2" cy="2" r="1" fill="${handlerColor}"/>
         <circle cx="6" cy="2" r="1" fill="${handlerColor}"/>
         <circle cx="2" cy="7" r="1" fill="${handlerColor}"/>
@@ -6286,22 +5817,124 @@ class TTSManager {
         <circle cx="6" cy="12" r="1" fill="${handlerColor}"/>
       </svg>
     `;
-    handlerIcon.style.cssText = `
+
+    const controls = document.createElement('div');
+    controls.style.cssText = `
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 8px !important;
+      width: 100% !important;
+    `;
+
+    this.bottomFloatingButton = document.createElement('button');
+    this.bottomFloatingButton.type = 'button';
+    this.bottomFloatingButton.setAttribute('data-action', 'toggle-playback');
+    this.bottomFloatingButton.style.cssText = `
+      width: 100% !important;
+      height: 40px !important;
+      min-height: 40px !important;
+      background: rgba(255, 255, 255, 0.08) !important;
+      color: ${textColor} !important;
+      border: 1px solid ${borderColor} !important;
+      box-shadow: none !important;
+      font-size: 14px !important;
+      font-weight: normal !important;
+      text-transform: none !important;
+      cursor: pointer !important;
+      transition: all 0.3s !important;
+      font-family: inherit !important;
+      outline: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      text-align: center !important;
+      white-space: nowrap !important;
+      z-index: 1 !important;
+      text-decoration: none !important;
+      border-radius: 10px !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
-      position: absolute !important;
-      right: 8px !important;
-      top: 50% !important;
-      transform: translateY(-50%) !important;
-      pointer-events: none !important;
+    `;
+
+    this.voiceSelect = document.createElement('select');
+    this.voiceSelect.style.cssText = `
+      width: 100% !important;
+      height: 32px !important;
+      min-height: 32px !important;
+      background: rgba(255, 255, 255, 0.08) !important;
+      color: ${textColor} !important;
+      border: 1px solid ${borderColor} !important;
+      border-radius: 10px !important;
+      font-size: 12px !important;
+      font-family: inherit !important;
+      cursor: pointer !important;
+      outline: none !important;
+      padding: 0 8px !important;
+      box-sizing: border-box !important;
+    `;
+
+    this.speedSelect = document.createElement('select');
+    this.speedSelect.style.cssText = `
+      width: 100% !important;
+      height: 32px !important;
+      min-height: 32px !important;
+      background: rgba(255, 255, 255, 0.08) !important;
+      color: ${textColor} !important;
+      border: 1px solid ${borderColor} !important;
+      border-radius: 10px !important;
+      font-size: 12px !important;
+      font-family: inherit !important;
+      cursor: pointer !important;
+      outline: none !important;
+      padding: 0 8px !important;
+      box-sizing: border-box !important;
+    `;
+
+    const playerRow = document.createElement('div');
+    playerRow.style.cssText = `
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      width: 100% !important;
+      justify-content: space-between !important;
+    `;
+
+    this.bottomFloatingButton.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" style="display:block; width:18px; height:18px; fill:${textColor};">
+        <path d="M346.8,785.1c-5,0-10-1.2-14.5-3.7-9.6-5.3-15.5-15.3-15.5-26.3V244.9c0-10.9,5.9-21,15.5-26.3,9.6-5.3,21.3-4.9,30.5.9l404.2,255.1c8.7,5.5,14,15.1,14,25.4s-5.3,19.9-14,25.4l-404.2,255.1c-4.9,3.1-10.4,4.6-16,4.6Z"></path>
+      </svg>
+    `;
+
+    playerRow.appendChild(this.bottomFloatingButton);
+    playerRow.appendChild(this.moveHandle);
+
+    controls.appendChild(this.voiceSelect);
+    controls.appendChild(this.speedSelect);
+    controls.appendChild(playerRow);
+
+    this.floatingLogo = logoWrap;
+    logoWrap.style.cssText += `
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
       flex-shrink: 0 !important;
     `;
-    buttonContainer.appendChild(handlerIcon);
 
-    this.bottomFloatingUI.appendChild(buttonContainer);
+    logoWrap.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.updateStatus('Anything Reader', '#4CAF50');
+    });
 
+    headerRow.appendChild(logoWrap);
+    headerRow.appendChild(this.moveHandle);
+    dock.appendChild(headerRow);
+    dock.appendChild(this.voiceSelect);
+    dock.appendChild(this.speedSelect);
+    dock.appendChild(this.bottomFloatingButton);
+    this.bottomFloatingUI.appendChild(dock);
 
+    this.populateDockVoiceSelect();
+    this.populateDockSpeedSelect();
 
     if (this.bottomFloatingButton) {
       this.bottomFloatingButton.addEventListener('click', (event) => {
@@ -6311,11 +5944,27 @@ class TTSManager {
 
     this.setupDraggableFloatingBar();
 
+    this.voiceSelect.addEventListener('change', async (event) => {
+      event.stopPropagation();
+      const voice = this.VOICES.find(v => v.id === this.voiceSelect.value) || this.getDefaultVoiceForModel();
+      await this.selectVoice(voice);
+    });
+
+    this.speedSelect.addEventListener('change', async (event) => {
+      event.stopPropagation();
+      const speed = Number(this.speedSelect.value) || this.playbackSpeed;
+      const previousSpeed = this.playbackSpeed;
+      this.playbackSpeed = speed;
+      await this.saveSpeedSetting(speed);
+      this.updateBottomFloatingUIState();
+      if (previousSpeed !== this.playbackSpeed) {
+        this.handleVoiceOrSpeedChange('speed_change');
+      }
+    });
+
     document.body.appendChild(this.bottomFloatingUI);
 
     this.bottomFloatingUI.style.display = 'none';
-
-    this.updateFloatingBarBorder('middle');
 
     this.updateBottomFloatingUITheme();
     this.updateBottomFloatingUIState();
@@ -6331,318 +5980,112 @@ class TTSManager {
     if (!this.bottomFloatingUI) return;
 
     let isDragging = false;
-    let startY = 0;
     let startX = 0;
-    let startBottom = 0;
+    let startY = 0;
+    let startTop = 0;
     let startLeft = 0;
-    let originalPosition = 'bottom';
-    let draggedPosition = null;
+    const handle = this.moveHandle;
 
     const handleMouseDown = (e) => {
-      if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
-        return;
-      }
-
-      this.updateTinyUI();
-
       isDragging = true;
       startY = e.clientY;
       startX = e.clientX;
-      startBottom = parseInt(this.bottomFloatingUI.style.bottom) || 0;
-      startLeft = parseInt(this.bottomFloatingUI.style.left) || 0;
-
-      this.bottomFloatingUI.style.cursor = 'grabbing';
+      const rect = this.bottomFloatingUI.getBoundingClientRect();
+      startTop = rect.top;
+      startLeft = rect.left;
       this.bottomFloatingUI.style.transition = 'none';
-
-      this.bottomFloatingUI.style.opacity = '0.8';
-
+      this.bottomFloatingUI.style.opacity = '0.9';
+      if (handle) {
+        handle.style.cursor = 'grabbing';
+      }
       e.preventDefault();
     };
 
     const handleMouseMove = (e) => {
       if (!isDragging) return;
-
-      const sideSnapZone = 40;
-      const isLeftSnap = e.clientX <= sideSnapZone;
-      const isRightSnap = e.clientX >= window.innerWidth - sideSnapZone;
-
-      if (isLeftSnap) {
-        this.bottomFloatingUI.style.transformOrigin = '0 0';
-        this.bottomFloatingUI.style.transform = 'rotate(90deg)';
-        this.bottomFloatingUI.style.left = '40px';
-        this.bottomFloatingUI.style.bottom = 'auto';
-        this.bottomFloatingUI.style.top = '0%';
-        this.bottomFloatingUI.style.width = '100vh';
-        this.bottomFloatingUI.style.padding = '0';
-        this.bottomFloatingUI.style.borderRadius = '0';
-        this.updateFloatingBarBorder('left');
-        this.restoreInfoElementsForSnap();
-        return;
-      } else if (isRightSnap) {
-        this.bottomFloatingUI.style.transformOrigin = '0 0';
-        this.bottomFloatingUI.style.transform = 'rotate(-90deg)';
-        this.bottomFloatingUI.style.left = `${window.innerWidth - 40}px`;
-        this.bottomFloatingUI.style.bottom = 'auto';
-        this.bottomFloatingUI.style.top = '100%';
-        this.bottomFloatingUI.style.width = '100vh';
-        this.bottomFloatingUI.style.padding = '0';
-        this.bottomFloatingUI.style.borderRadius = '0';
-        this.updateFloatingBarBorder('right');
-        this.restoreInfoElementsForSnap();
-        return;
-      }
-
-      let currentBottom = parseInt(this.bottomFloatingUI.style.bottom) || 0;
-      if (this.bottomFloatingUI.style.transform !== 'rotate(0deg)') {
-        const mouseY = e.clientY;
-        const windowHeight = window.innerHeight;
-        currentBottom = Math.max(0, windowHeight - mouseY - 20);
-        startBottom = currentBottom;
-      }
-
-      const deltaY = startY - e.clientY;
-      const newBottom = Math.max(0, startBottom + deltaY);
-
-      const maxBottom = window.innerHeight - 40;
-      const clampedBottom = Math.max(0, Math.min(newBottom, maxBottom));
-
-      const snapZone = 10;
-      let finalBottom = clampedBottom;
-
-      if (clampedBottom <= snapZone) {
-        finalBottom = 0;
-        this.updateFloatingBarBorder('bottom');
-        this.restoreInfoElementsForSnap();
-      }
-      else if (clampedBottom >= maxBottom - snapZone) {
-        finalBottom = maxBottom;
-        this.updateFloatingBarBorder('top');
-        this.restoreInfoElementsForSnap();
-      }
-      else {
-        finalBottom = clampedBottom;
-        this.updateFloatingBarBorder('middle');
-      }
-
-      this.bottomFloatingUI.style.transformOrigin = 'center center';
-      this.bottomFloatingUI.style.transform = 'rotate(0deg)';
-
-      if (finalBottom > 10 && finalBottom < maxBottom - 10) {
-        this.updateTinyUI();
-
-        const useTinyUI = this.tinyUIEnabled && this.isMiddleFloating;
-        const width = useTinyUI ? 230 : 700;
-        const halfWidth = useTinyUI ? 115 : 350;
-        const offset = useTinyUI ? -105 : -155;
-        const mouseX = e.clientX;
-
-        let leftPosition = Math.max(0, Math.min(mouseX - halfWidth + offset, window.innerWidth - width));
-
-        this.bottomFloatingUI.style.left = `${leftPosition}px`;
-        this.bottomFloatingUI.style.bottom = `${finalBottom}px`;
-        this.bottomFloatingUI.style.top = 'auto';
-        this.bottomFloatingUI.style.width = `${width}px`;
-        this.bottomFloatingUI.style.padding = '4px';
-        this.bottomFloatingUI.style.borderRadius = '5px';
-      } else {
-        this.bottomFloatingUI.style.left = '0px';
-        this.bottomFloatingUI.style.bottom = `${finalBottom}px`;
-        this.bottomFloatingUI.style.top = 'auto';
-        this.bottomFloatingUI.style.width = '100%';
-        this.bottomFloatingUI.style.padding = '0';
-        this.bottomFloatingUI.style.borderRadius = '0';
-
-        this.restoreInfoElementsForSnap();
-      }
-
-      if (finalBottom < 10) {
-        originalPosition = 'bottom';
-      } else {
-        originalPosition = 'dragged';
-        draggedPosition = finalBottom;
-      }
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      const rect = this.bottomFloatingUI.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
+      const left = Math.max(0, Math.min(startLeft + deltaX, window.innerWidth - width));
+      const top = Math.max(0, Math.min(startTop + deltaY, window.innerHeight - height));
+      this.bottomFloatingUI.style.left = `${left}px`;
+      this.bottomFloatingUI.style.top = `${top}px`;
+      this.bottomFloatingUI.style.right = 'auto';
+      this.bottomFloatingUI.style.bottom = 'auto';
+      this.bottomFloatingUI.style.transform = 'none';
     };
 
     const handleMouseUp = () => {
       if (!isDragging) return;
 
       isDragging = false;
-      this.bottomFloatingUI.style.cursor = 'grab';
       this.bottomFloatingUI.style.transition = 'all 0.3s ease';
       this.bottomFloatingUI.style.opacity = '1';
+      if (handle) {
+        handle.style.cursor = 'grab';
+      }
 
       this.saveFloatingBarState();
     };
 
-    this.bottomFloatingUI.addEventListener('mousedown', handleMouseDown);
+    if (handle) {
+      handle.addEventListener('mousedown', handleMouseDown);
+    }
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 
-    this.bottomFloatingUI.addEventListener('touchstart', (e) => {
-      if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
-        return;
-      }
-
-      this.updateTinyUI();
-
+    if (handle) {
+      handle.addEventListener('touchstart', (e) => {
       isDragging = true;
       startY = e.touches[0].clientY;
       startX = e.touches[0].clientX;
-      startBottom = parseInt(this.bottomFloatingUI.style.bottom) || 0;
-      startLeft = parseInt(this.bottomFloatingUI.style.left) || 0;
-
-      this.bottomFloatingUI.style.cursor = 'grabbing';
       this.bottomFloatingUI.style.transition = 'none';
       this.bottomFloatingUI.style.opacity = '0.8';
+      const rect = this.bottomFloatingUI.getBoundingClientRect();
+      startTop = rect.top;
+      startLeft = rect.left;
+      handle.style.cursor = 'grabbing';
 
       e.preventDefault();
-    });
+      });
 
-    document.addEventListener('touchmove', (e) => {
-      if (!isDragging) return;
-
-      const sideSnapZone = 40;
-      const isLeftSnap = e.touches[0].clientX <= sideSnapZone;
-      const isRightSnap = e.touches[0].clientX >= window.innerWidth - sideSnapZone;
-
-      if (isLeftSnap) {
-        this.bottomFloatingUI.style.transformOrigin = '0 0';
-        this.bottomFloatingUI.style.transform = 'rotate(90deg)';
-        this.bottomFloatingUI.style.left = '40px';
-        this.bottomFloatingUI.style.bottom = 'auto';
-        this.bottomFloatingUI.style.top = '0%';
-        this.bottomFloatingUI.style.width = '100vh';
-        this.bottomFloatingUI.style.padding = '0';
-        this.bottomFloatingUI.style.borderRadius = '0';
-        this.restoreInfoElementsForSnap();
-        e.preventDefault();
-        return;
-      } else if (isRightSnap) {
-        this.bottomFloatingUI.style.transformOrigin = '0 0';
-        this.bottomFloatingUI.style.transform = 'rotate(-90deg)';
-        this.bottomFloatingUI.style.left = `${window.innerWidth - 40}px`;
-        this.bottomFloatingUI.style.bottom = 'auto';
-        this.bottomFloatingUI.style.top = '100%';
-        this.bottomFloatingUI.style.width = '100vh';
-        this.bottomFloatingUI.style.padding = '0';
-        this.bottomFloatingUI.style.borderRadius = '0';
-        this.restoreInfoElementsForSnap();
-        e.preventDefault();
-        return;
-      }
-
-      let currentBottom = parseInt(this.bottomFloatingUI.style.bottom) || 0;
-      if (this.bottomFloatingUI.style.transform !== 'rotate(0deg)') {
-        const touchY = e.touches[0].clientY;
-        const windowHeight = window.innerHeight;
-        currentBottom = Math.max(0, windowHeight - touchY - 20);
-        startBottom = currentBottom;
-      }
-
-      const deltaY = startY - e.touches[0].clientY;
-      const newBottom = Math.max(0, startBottom + deltaY);
-
-      const maxBottom = window.innerHeight - 40;
-      const clampedBottom = Math.max(0, Math.min(newBottom, maxBottom));
-
-      const snapZone = 10;
-      let finalBottom = clampedBottom;
-
-      if (clampedBottom <= snapZone) {
-        finalBottom = 0;
-        this.restoreInfoElementsForSnap();
-      }
-      else if (clampedBottom >= maxBottom - snapZone) {
-        finalBottom = maxBottom;
-        this.restoreInfoElementsForSnap();
-      }
-      else {
-        finalBottom = clampedBottom;
-      }
-
-      this.bottomFloatingUI.style.transformOrigin = 'center center';
-      this.bottomFloatingUI.style.transform = 'rotate(0deg)';
-
-      if (finalBottom > 10 && finalBottom < maxBottom - 10) {
-        this.updateTinyUI();
-
-        const useTinyUI = this.tinyUIEnabled && this.isMiddleFloating;
-        const width = useTinyUI ? 230 : 700;
-        const halfWidth = width;
-
+      document.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
         const deltaX = e.touches[0].clientX - startX;
-        const deltaY = startY - e.touches[0].clientY;
-        const newLeft = startLeft + deltaX;
-
-        let leftPosition = Math.max(0, Math.min(newLeft, window.innerWidth - halfWidth));
-
-        this.bottomFloatingUI.style.left = `${leftPosition}px`;
-        this.bottomFloatingUI.style.bottom = `${finalBottom}px`;
-        this.bottomFloatingUI.style.top = 'auto';
-        this.bottomFloatingUI.style.width = `${width}px`;
-        this.bottomFloatingUI.style.padding = '4px';
-        this.bottomFloatingUI.style.borderRadius = '5px';
-      } else {
-        this.bottomFloatingUI.style.left = '0px';
-        this.bottomFloatingUI.style.bottom = `${finalBottom}px`;
-        this.bottomFloatingUI.style.top = 'auto';
-        this.bottomFloatingUI.style.width = '100%';
-        this.bottomFloatingUI.style.padding = '0';
-        this.bottomFloatingUI.style.borderRadius = '0';
-
-        this.restoreInfoElementsForSnap();
-      }
-
-      if (finalBottom < 10) {
-        originalPosition = 'bottom';
-      } else {
-        originalPosition = 'dragged';
-        draggedPosition = finalBottom;
-      }
-
-      e.preventDefault();
-    });
-
-    document.addEventListener('touchend', handleMouseUp);
-
-    this.bottomFloatingUI.addEventListener('dblclick', (e) => {
-      if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
-        return;
-      }
-
-      this.resetFloatingBarPosition();
-    });
-
-    this.updateTinyUI();
+        const deltaY = e.touches[0].clientY - startY;
+        const rect = this.bottomFloatingUI.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        const left = Math.max(0, Math.min(startLeft + deltaX, window.innerWidth - width));
+        const top = Math.max(0, Math.min(startTop + deltaY, window.innerHeight - height));
+        this.bottomFloatingUI.style.left = `${left}px`;
+        this.bottomFloatingUI.style.top = `${top}px`;
+        this.bottomFloatingUI.style.right = 'auto';
+        this.bottomFloatingUI.style.bottom = 'auto';
+        this.bottomFloatingUI.style.transform = 'none';
+        e.preventDefault();
+      });
+      document.addEventListener('touchend', handleMouseUp);
+    }
   }
 
   resetFloatingBarPosition() {
     if (!this.bottomFloatingUI) return;
 
-    this.isMiddleFloating = true;
-
-    const useTinyUI = this.tinyUIEnabled;
-    const width = useTinyUI ? 200 : 700;
-    const centerX = (window.innerWidth / 2) - (width / 2);
-
-    this.bottomFloatingUI.style.left = `${centerX}px`;
-    this.bottomFloatingUI.style.bottom = '30px';
+    const width = 124;
+    const height = 188;
+    this.bottomFloatingUI.style.left = 'auto';
+    this.bottomFloatingUI.style.right = '20px';
+    this.bottomFloatingUI.style.top = `calc(50% - ${height / 2}px)`;
+    this.bottomFloatingUI.style.bottom = 'auto';
     this.bottomFloatingUI.style.transform = 'none';
     this.bottomFloatingUI.style.width = `${width}px`;
-    this.bottomFloatingUI.style.padding = '4px';
-    this.bottomFloatingUI.style.borderRadius = '5px';
-    this.bottomFloatingUI.style.top = 'auto';
+    this.bottomFloatingUI.style.padding = '10px 8px';
+    this.bottomFloatingUI.style.borderRadius = '14px';
     this.bottomFloatingUI.style.transformOrigin = 'center center';
     this.bottomFloatingUI.style.transition = 'all 0.3s ease';
-
-    if (useTinyUI) {
-      this.applyTinyUI();
-    } else {
-      this.restoreTinyUI();
-    }
-
-    this.updateFloatingBarBorder('middle');
-
   }
 
   getSpeedText(speed) {
@@ -6905,355 +6348,88 @@ class TTSManager {
 
   updatePageReadError() {
     if (!this.bottomFloatingButton || !this.isPageReadError) return;
-
-    let isSnapped = false;
-    if (this.bottomFloatingUI) {
-      const currentBottom = parseInt(this.bottomFloatingUI.style.bottom) || 0;
-      const currentLeft = parseInt(this.bottomFloatingUI.style.left) || 0;
-      const currentWidth = this.bottomFloatingUI.style.width || '';
-      const currentTransform = this.bottomFloatingUI.style.transform || '';
-      const maxBottom = window.innerHeight - 40;
-
-      const isBottomSnap = currentBottom === 0;
-      const isTopSnap = currentBottom >= maxBottom - 10;
-      const isLeftRotateSnap = currentLeft === 40 && currentTransform.includes('rotate(90deg)');
-      const isRightRotateSnap = currentLeft === window.innerWidth - 40 && currentTransform.includes('rotate(-90deg)');
-      const isVerticalSnap = currentWidth === '100%';
-      const isHorizontalSnap = currentWidth === '100vh';
-      const isRotated = currentTransform.includes('rotate') && !currentTransform.includes('rotate(0deg)');
-
-      isSnapped = isBottomSnap ||
-                  isTopSnap ||
-                  isLeftRotateSnap ||
-                  isRightRotateSnap ||
-                  isVerticalSnap ||
-                  isHorizontalSnap ||
-                  isRotated;
-    }
-
-    const isMiddleFloating = !isSnapped;
-    const useTinyUI = isMiddleFloating && this.tinyUIEnabled;
-    const detailText = this.lastPageReadError ? `TTS error: ${this.lastPageReadError}` : null;
-    const errorText = detailText || (isSnapped || !useTinyUI
-        ? 'Sorry, \'tis out of my dictionary. 0 → 1'
-        : '0 → 1');
-
-    const textColor = this.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : '#1d1d1d';
-    this.bottomFloatingButton.innerHTML = `
-      <span style="cursor: default; color: ${textColor};">
-        ${errorText}
-      </span>
-    `;
-    this.bottomFloatingButton.style.display = 'block';
-    this.bottomFloatingButton.style.pointerEvents = 'none';
-    this.bottomFloatingButton.style.cursor = 'default';
+    this.bottomFloatingButton.style.display = 'flex';
+    this.bottomFloatingButton.style.pointerEvents = 'auto';
+    this.bottomFloatingButton.style.cursor = 'pointer';
+    this.bottomFloatingButton.title = this.lastPageReadError ? `TTS error: ${this.lastPageReadError}` : 'TTS error';
+    this.updateBottomFloatingUIState();
   }
 
   updateLowPowerError(powerStatus) {
     if (!this.bottomFloatingButton || !this.isPageReadError) return;
-
-    let isSnapped = false;
-    if (this.bottomFloatingUI) {
-      const currentBottom = parseInt(this.bottomFloatingUI.style.bottom) || 0;
-      const currentLeft = parseInt(this.bottomFloatingUI.style.left) || 0;
-      const currentWidth = this.bottomFloatingUI.style.width || '';
-      const currentTransform = this.bottomFloatingUI.style.transform || '';
-      const maxBottom = window.innerHeight - 40;
-
-      const isBottomSnap = currentBottom === 0;
-      const isTopSnap = currentBottom >= maxBottom - 10;
-      const isLeftRotateSnap = currentLeft === 40 && currentTransform.includes('rotate(90deg)');
-      const isRightRotateSnap = currentLeft === window.innerWidth - 40 && currentTransform.includes('rotate(-90deg)');
-      const isVerticalSnap = currentWidth === '100%';
-      const isHorizontalSnap = currentWidth === '100vh';
-      const isRotated = currentTransform.includes('rotate') && !currentTransform.includes('rotate(0deg)');
-
-      isSnapped = isBottomSnap ||
-                  isTopSnap ||
-                  isLeftRotateSnap ||
-                  isRightRotateSnap ||
-                  isVerticalSnap ||
-                  isHorizontalSnap ||
-                  isRotated;
-    }
-
-    const isMiddleFloating = !isSnapped;
-    const useTinyUI = isMiddleFloating && this.tinyUIEnabled;
-    const errorText = isSnapped || !useTinyUI
-      ? 'Sorry, \'tis out of my dictionary. 0 → 1'
-      : '0 → 1';
-
-    const textColor = this.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : '#1d1d1d';
-    this.bottomFloatingButton.innerHTML = `
-      <span style="cursor: default; color: ${textColor};">
-        ${errorText}
-      </span>
-    `;
-    this.bottomFloatingButton.style.display = 'block';
-    this.bottomFloatingButton.style.pointerEvents = 'none';
-    this.bottomFloatingButton.style.cursor = 'default';
+    this.bottomFloatingButton.style.display = 'flex';
+    this.bottomFloatingButton.style.pointerEvents = 'auto';
+    this.bottomFloatingButton.style.cursor = 'pointer';
+    this.bottomFloatingButton.title = 'TTS low power';
+    this.updateBottomFloatingUIState();
   }
 
   updateBottomFloatingUIState() {
     if (!this.bottomFloatingButton) return;
 
-    if (this.isPageReadError) {
-      this.updatePageReadError();
-      return;
-    }
+    const isPlaying = this.isPlaying && !this.isPaused;
+    const isPaused = this.isPlaying && this.isPaused;
+    const textColor = this.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.8)' : '#1d1d1d';
+    const fillColor = this.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.82)' : '#1d1d1d';
+    const iconPath = isPlaying
+      ? '<path d="M596.1,235.5h163.8v529h-163.8z M316,235.5h163.8v529h-163.8z"/>'
+      : '<path d="M346.8,785.1c-5,0-10-1.2-14.5-3.7-9.6-5.3-15.5-15.3-15.5-26.3V244.9c0-10.9,5.9-21,15.5-26.3,9.6-5.3,21.3-4.9,30.5.9l404.2,255.1c8.7,5.5,14,15.1,14,25.4s-5.3,19.9-14,25.4l-404.2,255.1c-4.9,3.1-10.4,4.6-16,4.6Z"/>';
 
-    const textColor = this.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : '#1d1d1d';
-    const underlineColor = this.currentTheme === 'dark' ? 'rgba(170, 170, 170, 0.4)' : 'rgba(29, 29, 29, 0.4)';
+    this.populateDockVoiceSelect();
+    this.populateDockSpeedSelect();
 
-    let isSnapped = false;
+    this.voiceSelect.value = this.selectedVoice?.id || this.getDefaultVoiceForModel().id;
+    this.speedSelect.value = String(this.playbackSpeed);
+
+    this.bottomFloatingButton.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" style="display:block; width:18px; height:18px; fill:${fillColor}; opacity:${this.isPageReadError ? 0.4 : 1};">
+        ${iconPath}
+      </svg>
+    `;
+    this.bottomFloatingButton.title = this.isPageReadError
+      ? (this.lastPageReadError ? `TTS error: ${this.lastPageReadError}` : 'TTS error')
+      : (isPlaying ? 'Pause' : isPaused ? 'Resume' : 'Play');
+    this.bottomFloatingButton.disabled = false;
+    this.bottomFloatingButton.style.cursor = 'pointer';
+    this.bottomFloatingButton.style.opacity = this.isPageReadError ? '0.6' : '1';
+
     if (this.bottomFloatingUI) {
-      const currentBottom = parseInt(this.bottomFloatingUI.style.bottom) || 0;
-      const currentLeft = parseInt(this.bottomFloatingUI.style.left) || 0;
-      const currentWidth = this.bottomFloatingUI.style.width || '';
-      const currentTransform = this.bottomFloatingUI.style.transform || '';
-      const maxBottom = window.innerHeight - 40;
-
-      const isBottomSnap = currentBottom === 0;
-      const isTopSnap = currentBottom >= maxBottom - 10;
-      const isLeftRotateSnap = currentLeft === 40 && currentTransform.includes('rotate(90deg)');
-      const isRightRotateSnap = currentLeft === window.innerWidth - 40 && currentTransform.includes('rotate(-90deg)');
-      const isVerticalSnap = currentWidth === '100%';
-      const isHorizontalSnap = currentWidth === '100vh';
-      const isRotated = currentTransform.includes('rotate') && !currentTransform.includes('rotate(0deg)');
-
-      isSnapped = isBottomSnap ||
-                  isTopSnap ||
-                  isLeftRotateSnap ||
-                  isRightRotateSnap ||
-                  isVerticalSnap ||
-                  isHorizontalSnap ||
-                  isRotated;
+      this.bottomFloatingUI.title = this.bottomFloatingUI.title || 'Anything Reader';
     }
+  }
 
-    const useTinyUI = !isSnapped && this.tinyUIEnabled && this.isMiddleFloating;
+  populateDockVoiceSelect() {
+    if (!this.voiceSelect) return;
 
-    if (isSnapped) {
-      const arText = document.getElementById('tts-ar-text');
-      if (arText) {
-        arText.style.display = '';
-      }
-      if (this.bottomTakeCountLabel) {
-        this.bottomTakeCountLabel.style.display = '';
-      }
-      if (this.refreshButton) {
-        this.refreshButton.style.display = '';
-      }
-    }
-    const speedText = useTinyUI ? this.getSpeedTextForTinyUI(this.playbackSpeed) : this.getSpeedText(this.playbackSpeed);
+    const currentVoiceId = this.selectedVoice?.id;
+    this.voiceSelect.replaceChildren();
 
-    const isInactiveState = !this.isPlaying || this.isPaused;
-    const speedOpacity = isInactiveState ? 0.3 : 1.0;
-    const speedTextColor = this.currentTheme === 'dark'
-      ? `rgba(255, 255, 255, ${0.6 * speedOpacity})`
-      : `rgba(29, 29, 29, ${speedOpacity})`;
-    const atTextColor = this.currentTheme === 'dark'
-      ? `rgba(255, 255, 255, ${0.6 * speedOpacity})`
-      : `rgba(29, 29, 29, ${speedOpacity})`;
+    this.VOICES.forEach((voice) => {
+      const option = document.createElement('option');
+      option.value = voice.id;
+      option.textContent = voice.name;
+      option.title = voice.description;
+      this.voiceSelect.appendChild(option);
+    });
 
-    if (this.isPlaying && !this.isPaused) {
-      const iconSize = useTinyUI ? '20px' : `${this.UI_FONT_SIZE}`;
-      if (useTinyUI) {
-        // Tiny UI: "<Speaker> [speed] [pause icon]"
-        this.bottomFloatingButton.innerHTML = `
-          <span style="cursor: pointer; color: ${textColor}; position: relative; top: -1px;">
-            <span style="
-              text-decoration: underline;
-              text-underline-position: under;
-              display: inline;
-              text-decoration-color: ${underlineColor};
-              text-underline-offset: 5%;
-              cursor: pointer;
-              color: ${textColor};
-            " data-action="voice-menu">${this.selectedVoice.name}</span> <span style="
-              color: ${speedTextColor};
-              margin: 0;
-              cursor: pointer;
-              text-decoration: underline;
-              text-underline-position: under;
-              text-decoration-color: ${underlineColor};
-              text-underline-offset: 5%;
-            " data-action="speed-menu">${speedText}</span><span style="display: inline-block; vertical-align: middle; margin: 0 0 0 0; cursor: pointer; position: relative; top: -1px; left: 3px;" data-action="toggle-playback">
-              <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 100%; height: 100%; fill: ${textColor};">
-                <path d="M596.1,235.5h163.8v529h-163.8z M316,235.5h163.8v529h-163.8z"/>
-              </svg>
-            </span>
-          </span>
-        `;
-      } else {
-      this.bottomFloatingButton.innerHTML = `
-        <span style="cursor: pointer; color: ${textColor}; position: relative; top: -1px;">
-          <span style="
-            text-decoration: underline;
-            text-underline-position: under;
-            display: inline;
-            text-decoration-color: ${underlineColor};
-            text-underline-offset: 5%;
-            cursor: pointer;
-            color: ${textColor};
-          " data-action="voice-menu">${this.selectedVoice.name}</span> is <span style="
-            text-decoration: underline;
-            text-underline-position: under;
-            display: inline;
-            text-decoration-color: ${underlineColor};
-            text-underline-offset: 5%;
-            cursor: pointer;
-            color: ${textColor};
-            " data-action="toggle-playback">reading</span><span style="display: inline-block; vertical-align: middle; margin: 0 0 0 0; cursor: pointer; position: relative; top: -1px;" data-action="toggle-playback">
-            <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 100%; height: 100%; fill: ${textColor};">
-              <path d="M596.1,235.5h163.8v529h-163.8z M316,235.5h163.8v529h-163.8z"/>
-            </svg>
-          </span> <span style="
-            color: ${speedTextColor};
-            margin: 0;
-            cursor: pointer;
-            text-decoration: underline;
-            text-underline-position: under;
-            text-decoration-color: ${underlineColor};
-            text-underline-offset: 5%;
-          " data-action="speed-menu">
-            ${speedText}
-          </span>
-        </span>
-      `;
-      }
-    } else if (this.isPaused) {
-      const iconSize = useTinyUI ? '20px' : `${this.UI_FONT_SIZE}`;
-      if (useTinyUI) {
-        // Tiny UI: "<Speaker> [speed] [play icon]"
-        this.bottomFloatingButton.innerHTML = `
-          <span style="cursor: pointer; color: ${textColor}; position: relative; top: -1px;">
-            <span style="
-              text-decoration: underline;
-              text-underline-position: under;
-              display: inline;
-              text-decoration-color: ${underlineColor};
-              text-underline-offset: 5%;
-              cursor: pointer;
-              color: ${textColor};
-            " data-action="voice-menu">${this.selectedVoice.name}</span> <span style="
-              color: ${speedTextColor};
-              margin: 0;
-              cursor: pointer;
-              text-decoration: underline;
-              text-underline-position: under;
-              text-decoration-color: ${underlineColor};
-              text-underline-offset: 5%;
-            " data-action="speed-menu">${speedText}</span><span style="display: inline-block; vertical-align: middle; margin: 0 0 0 0; cursor: pointer; position: relative; top: -1px; left: 3px;" data-action="toggle-playback">
-              <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 100%; height: 100%; fill: ${textColor};">
-                <path d="M346.8,785.1c-5,0-10-1.2-14.5-3.7-9.6-5.3-15.5-15.3-15.5-26.3V244.9c0-10.9,5.9-21,15.5-26.3,9.6-5.3,21.3-4.9,30.5.9l404.2,255.1c8.7,5.5,14,15.1,14,25.4s-5.3,19.9-14,25.4l-404.2,255.1c-4.9,3.1-10.4,4.6-16,4.6Z"/>
-              </svg>
-            </span>
-          </span>
-        `;
-      } else {
-      this.bottomFloatingButton.innerHTML = `
-        <span style="cursor: pointer; color: ${textColor}; position: relative; top: -1px;">
-          <span style="
-            text-decoration: underline;
-            text-underline-position: under;
-            display: inline;
-            text-decoration-color: ${underlineColor};
-            text-underline-offset: 5%;
-            cursor: pointer;
-            color: ${textColor};
-          " data-action="voice-menu">${this.selectedVoice.name}</span> is <span style="
-            text-decoration: underline;
-            text-underline-position: under;
-            display: inline;
-            text-decoration-color: ${underlineColor};
-            text-underline-offset: 5%;
-            cursor: pointer;
-            color: ${textColor};
-            " data-action="toggle-playback">paused</span><span style="display: inline-block; vertical-align: middle; margin: 0 0 0 0; cursor: pointer; position: relative; top: -1px;" data-action="toggle-playback">
-            <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 100%; height: 100%; fill: ${textColor};">
-              <path d="M346.8,785.1c-5,0-10-1.2-14.5-3.7-9.6-5.3-15.5-15.3-15.5-26.3V244.9c0-10.9,5.9-21,15.5-26.3,9.6-5.3,21.3-4.9,30.5.9l404.2,255.1c8.7,5.5,14,15.1,14,25.4s-5.3,19.9-14,25.4l-404.2,255.1c-4.9,3.1-10.4,4.6-16,4.6Z"/>
-            </svg>
-          </span> <span style="
-            color: ${speedTextColor};
-            margin: 0;
-            cursor: pointer;
-            text-decoration: underline;
-            text-underline-position: under;
-            text-decoration-color: ${underlineColor};
-            text-underline-offset: 5%;
-          " data-action="speed-menu">
-            ${speedText}
-          </span>
-        </span>
-      `;
-      }
-    } else {
-      const iconSize = useTinyUI ? '20px' : `${this.UI_FONT_SIZE}`;
-      if (useTinyUI) {
-        // Tiny UI: "<Speaker> [speed] [play icon]"
-        this.bottomFloatingButton.innerHTML = `
-          <span style="color: ${textColor}; position: relative; top: -1px;">
-            <span style="
-              text-decoration: underline;
-              text-underline-position: under;
-              display: inline;
-              text-decoration-color: ${underlineColor};
-              text-underline-offset: 5%;
-              cursor: pointer;
-              color: ${textColor};
-            " data-action="voice-menu">${this.selectedVoice.name}</span> <span style="
-              color: ${speedTextColor};
-              margin: 0;
-              cursor: pointer;
-              text-decoration: underline;
-              text-underline-position: under;
-              text-decoration-color: ${underlineColor};
-              text-underline-offset: 5%;
-            " data-action="speed-menu">${speedText}</span><span style="display: inline-block; vertical-align: middle; margin: 0 0 0 0; cursor: pointer; position: relative; top: -1px; left: 3px;" data-action="start-reading">
-              <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 100%; height: 100%; fill: ${textColor};">
-                <path d="M346.8,785.1c-5,0-10-1.2-14.5-3.7-9.6-5.3-15.5-15.3-15.5-26.3V244.9c0-10.9,5.9-21,15.5-26.3,9.6-5.3,21.3-4.9,30.5.9l404.2,255.1c8.7,5.5,14,15.1,14,25.4s-5.3,19.9-14,25.4l-404.2,255.1c-4.9,3.1-10.4,4.6-16,4.6Z"/>
-              </svg>
-            </span>
-          </span>
-        `;
-      } else {
-      this.bottomFloatingButton.innerHTML = `
-        <span style="color: ${textColor}; position: relative; top: -1px;">
-          <span style="
-            text-decoration: underline;
-            text-underline-position: under;
-            display: inline;
-            text-decoration-color: ${underlineColor};
-            text-underline-offset: 5%;
-            cursor: pointer;
-            color: ${textColor};
-          " data-action="voice-menu">${this.selectedVoice.name}</span> is ready to <span style="
-            text-decoration: underline;
-            text-underline-position: under;
-            display: inline;
-            text-decoration-color: ${underlineColor};
-            text-underline-offset: 5%;
-            cursor: pointer;
-            color: ${textColor};
-            " data-action="start-reading">read</span><span style="display: inline-block; vertical-align: middle; margin: 0 0 0 0; cursor: pointer; position: relative; top: -1px;" data-action="start-reading">
-            <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" style="display: block; width: 100%; height: 100%; fill: ${textColor}; opacity: ${this.playIconOpacity};">
-              <path d="M346.8,785.1c-5,0-10-1.2-14.5-3.7-9.6-5.3-15.5-15.3-15.5-26.3V244.9c0-10.9,5.9-21,15.5-26.3,9.6-5.3,21.3-4.9,30.5.9l404.2,255.1c8.7,5.5,14,15.1,14,25.4s-5.3,19.9-14,25.4l-404.2,255.1c-4.9,3.1-10.4,4.6-16,4.6Z"/>
-            </svg>
-          </span> <span style="
-            color: ${speedTextColor};
-            margin: 0;
-            cursor: pointer;
-            text-decoration: underline;
-            text-underline-position: under;
-            text-decoration-color: ${underlineColor};
-            text-underline-offset: 5%;
-          " data-action="speed-menu">
-            ${speedText}
-          </span>
-        </span>
-      `;
-      }
-    }
+    this.voiceSelect.value = this.VOICES.some((voice) => voice.id === currentVoiceId)
+      ? currentVoiceId
+      : this.getDefaultVoiceForModel().id;
+  }
+
+  populateDockSpeedSelect() {
+    if (!this.speedSelect) return;
+
+    this.speedSelect.replaceChildren();
+
+    this.SPEED_OPTIONS.forEach((speedOption) => {
+      const option = document.createElement('option');
+      option.value = String(speedOption.speed);
+      option.textContent = speedOption.text;
+      this.speedSelect.appendChild(option);
+    });
+
+    this.speedSelect.value = String(this.playbackSpeed);
   }
 
   async handleBottomFloatingButtonClick(event) {
