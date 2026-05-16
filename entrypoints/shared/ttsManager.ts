@@ -10,6 +10,37 @@ import {
   updatePlayerDockState,
   updatePlayerDockTheme,
 } from './player-dock';
+import {
+  handleSpeedMenuOutsideClick,
+  hideSpeedMenu,
+  selectSpeed,
+  showSpeedMenu,
+  getSpeedText,
+  getSpeedTextForTinyUI,
+} from './speed-menu';
+import {
+  addToAudioCache,
+  clearAllAudio,
+  getFromAudioCache,
+  getTakeAudioCacheKey,
+  pausePlayback,
+  prefetchNextTakes,
+  prepareNextTake,
+  resumePlayback,
+  stopAll,
+} from './playback';
+import {
+  handleVoiceMenuOutsideClick,
+  hideVoiceMenu,
+  selectVoice,
+  showVoiceMenu,
+  updateVoiceMenuSelection,
+} from './voice-menu';
+import {
+  initializeSupertonic,
+  unloadSupertonic,
+  warmupTTSModel,
+} from './tts-session';
 
 class TTSManager {
   constructor() {
@@ -300,78 +331,15 @@ class TTSManager {
   }
 
   async initializeSupertonic(showErrors = true) {
-    if (!this.isPluginEnabled) {
-      return;
-    }
-
-    if (this.supertonicInitPromise) {
-      return this.supertonicInitPromise;
-    }
-
-    if (this.ttsInitialized && this.initializedTtsModel === this.ttsModel) {
-      return;
-    }
-
-    this.supertonicInitPromise = (async () => {
-      try {
-        const result = await this.sendTTSMessage('tts-initialize', { model: this.ttsModel });
-
-        if (!result.success) {
-          if (result.error === 'low_power') {
-            if (showErrors) {
-              this.showLowPowerError(result.powerStatus);
-            }
-          } else {
-            if (showErrors) {
-              this.showPageReadError(result.error);
-            }
-          }
-          throw new Error(result.error || `${this.ttsModel} TTS initialization failed`);
-        }
-
-        this.ttsInitialized = true;
-        this.initializedTtsModel = this.ttsModel;
-      } catch (error) {
-        this.error('❌ Supertonic TTS engine initialization failed:', error);
-        this.ttsInitialized = false;
-        this.initializedTtsModel = null;
-        if (showErrors) {
-          this.showPageReadError(error instanceof Error ? error.message : String(error));
-        }
-        throw error;
-      } finally {
-        this.supertonicInitPromise = null;
-      }
-    })();
-
-    return this.supertonicInitPromise;
+    return initializeSupertonic(this, showErrors);
   }
 
   async warmupTTSModel() {
-    if (this.ttsInitialized || this.supertonicInitPromise) {
-      return this.supertonicInitPromise;
-    }
-
-    window.setTimeout(() => {
-      this.initializeSupertonic(false).catch((error) => {
-        this.warn('TTS warmup failed:', error);
-      });
-    }, 250);
-
-    return null;
+    return warmupTTSModel(this);
   }
 
   async unloadSupertonic() {
-    try {
-      if (this.isPlaying) {
-        this.stopAll();
-      }
-      await this.sendTTSMessage('tts-unload');
-      this.ttsInitialized = false;
-      this.log('✅ ONNX models unloaded');
-    } catch (error) {
-      this.error('❌ Failed to unload Supertonic TTS:', error);
-    }
+    return unloadSupertonic(this);
   }
 
 
@@ -3513,119 +3481,23 @@ class TTSManager {
   }
 
   getTakeAudioCacheKey(take) {
-    const takeId = take?.id || this.currentPlayList?.indexOf(take) || 'unknown';
-    return [
-      'take',
-      takeId,
-      this.ttsModel,
-      this.selectedVoice?.id || 'M1',
-      this.playbackSpeed,
-      this.quality,
-      this.highlightColorIndex
-    ].join('_');
+    return getTakeAudioCacheKey(this, take);
   }
 
   getFromAudioCache(cacheKey) {
-    if (!this.audioCache) {
-      this.audioCache = new Map();
-    }
-
-    const value = this.audioCache.get(cacheKey);
-    if (value) {
-      this.audioCache.delete(cacheKey);
-      this.audioCache.set(cacheKey, value);
-    }
-    return value || null;
+    return getFromAudioCache(this, cacheKey);
   }
 
   addToAudioCache(cacheKey, audioUrl) {
-    if (!audioUrl) return;
-    if (!this.audioCache) {
-      this.audioCache = new Map();
-    }
-
-    if (this.audioCache.has(cacheKey)) {
-      this.audioCache.delete(cacheKey);
-    }
-
-    this.audioCache.set(cacheKey, audioUrl);
-
-    const maxSize = this.maxAudioCacheSize || 24;
-    while (this.audioCache.size > maxSize) {
-      const oldestKey = this.audioCache.keys().next().value;
-      const oldestValue = this.audioCache.get(oldestKey);
-      if (typeof oldestValue === 'string' && oldestValue.startsWith('blob:')) {
-        URL.revokeObjectURL(oldestValue);
-      }
-      this.audioCache.delete(oldestKey);
-    }
+    return addToAudioCache(this, cacheKey, audioUrl);
   }
 
   prefetchNextTakes(startIndex, count = 4) {
-    if (!this.currentPlayList || this.shouldStopSequentialPlayback || !this.isPluginEnabled) {
-      return;
-    }
-
-    const endIndex = Math.min(startIndex + count, this.currentPlayList.length);
-    this.audioPrefetchQueue = (this.audioPrefetchQueue || Promise.resolve()).then(async () => {
-      for (let index = startIndex; index < endIndex; index++) {
-        if (this.shouldStopSequentialPlayback || !this.isPluginEnabled) {
-          return;
-        }
-        await this.prepareNextTake(index);
-      }
-    }).catch((error) => {
-      this.warn('Prefetch queue failed:', error);
-    });
+    return prefetchNextTakes(this, startIndex, count);
   }
 
   prepareNextTake(playListIndex) {
-    const take = this.currentPlayList?.[playListIndex];
-    if (!take || this.shouldStopSequentialPlayback || !this.isPluginEnabled) {
-      return null;
-    }
-
-    const cacheKey = this.getTakeAudioCacheKey(take);
-    if (this.getFromAudioCache(cacheKey)) {
-      return Promise.resolve(this.getFromAudioCache(cacheKey));
-    }
-
-    if (!this.audioPrefetchPromises) {
-      this.audioPrefetchPromises = new Map();
-    }
-
-    if (this.audioPrefetchPromises.has(cacheKey)) {
-      return this.audioPrefetchPromises.get(cacheKey);
-    }
-
-    const promise = (async () => {
-      await this.waitForGenerationSlot();
-      if (this.shouldStopSequentialPlayback || !this.isPluginEnabled) {
-        return null;
-      }
-
-      const audioUrl = await this.generateTTSAudio(take, {
-        showAnimation: false,
-        updateStatus: false,
-        scrollToElement: false,
-        playAfterGenerate: false,
-        context: 'prefetch'
-      });
-
-      if (audioUrl) {
-        this.addToAudioCache(cacheKey, audioUrl);
-      }
-
-      return audioUrl;
-    })().catch((error) => {
-      this.warn(`Prefetch failed for take ${playListIndex}:`, error);
-      return null;
-    }).finally(() => {
-      this.audioPrefetchPromises.delete(cacheKey);
-    });
-
-    this.audioPrefetchPromises.set(cacheKey, promise);
-    return promise;
+    return prepareNextTake(this, playListIndex);
   }
 
   async waitForGenerationSlot() {
@@ -4981,28 +4853,7 @@ class TTSManager {
   }
 
   stopAll() {
-
-    if (this.currentAudio) {
-      this.currentAudio.pause();
-      this.currentAudio = null;
-    }
-
-    this.isPlaying = false;
-    this.isPaused = false;
-    this.currentPlayList = [];
-    this.currentTakeIndex = 0;
-    this.currentPlayingTakeId = null;
-
-    if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
-    }
-
-    this.cleanupWordTracking();
-
-    this.updateStatus('Playback stopped', '#FF9800');
-    this.updateProgress(0);
-
+    return stopAll(this);
   }
 
   selectVoice(index) {
@@ -5569,187 +5420,27 @@ class TTSManager {
   }
 
   getSpeedText(speed) {
-    if (speed <= 0.9) return 'slightly slower';
-    if (speed <= 1.0) return 'normally';
-    if (speed <= 1.2) return 'slightly faster';
-    return 'fast';
+    return getSpeedText(speed);
   }
 
   getSpeedTextForTinyUI(speed) {
-    if (speed <= 0.9) return '0.8x';
-    if (speed <= 1.0) return '1.0x';
-    if (speed <= 1.2) return '1.2x';
-    return '1.4x';
+    return getSpeedTextForTinyUI(speed);
   }
 
   showSpeedMenu() {
-    this.hideSpeedMenu();
-
-    const isDark = this.currentTheme === 'dark';
-    const bgColor = isDark ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)';
-    const textColor = isDark ? 'rgba(255, 255, 255, 0.6)' : '#1d1d1d';
-    const borderColor = isDark ? 'rgba(255, 255, 255, 1.0)' : 'rgba(29, 29, 29, 0.3)';
-
-    this.speedMenuPopup = document.createElement('div');
-    this.speedMenuPopup.id = 'tts-speed-menu-popup';
-    this.speedMenuPopup.style.cssText = `
-      position: fixed !important;
-      bottom: 0 !important;
-      left: 50% !important;
-      transform: translate(-50%, 0) !important;
-      width: 15% !important;
-      min-height: auto !important;
-      max-height: none !important;
-      height: auto !important;
-      background: ${bgColor} !important;
-      backdrop-filter: blur(10px) !important;
-      -webkit-backdrop-filter: blur(10px) !important;
-      border: none !important;
-      border-radius: 0 !important;
-      box-shadow: 0px 0px 60px rgba(125,125,125,.5) !important;
-      z-index: 2147483647 !important;
-      line-height: 1.5rem !important;
-      padding: 0 !important;
-      overflow-y: auto !important;
-      -ms-overflow-style: none !important;
-      scrollbar-width: none !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      animation: slideIn 0.7s ease forwards !important;
-    `;
-
-    this.speedMenuPopup.style.setProperty('-webkit-scrollbar', 'none', 'important');
-
-    const title = document.createElement('div');
-    title.style.cssText = `
-      margin-bottom: 24px !important;
-      font-weight: 400 !important;
-      -webkit-text-stroke: 0.03em !important;
-      paint-order: stroke fill !important;
-      color: ${textColor} !important;
-      padding: 24px 24px 0 24px !important;
-      text-align: center !important;
-      text-transform: none !important;
-              font-size: ${this.UI_FONT_SIZE} !important;
-    `;
-    title.textContent = 'Reading Speed';
-    this.speedMenuPopup.appendChild(title);
-
-    this.SPEED_OPTIONS.forEach((speedOption) => {
-      const speedItem = document.createElement('div');
-      speedItem.style.cssText = `
-        padding: 5px 24px 10px 24px !important;
-        cursor: pointer !important;
-        border-radius: 8px !important;
-        -webkit-tap-highlight-color: rgba(139, 69, 19, 0.1) !important;
-        transition: background-color 0.2s !important;
-      `;
-
-      const typography = document.createElement('div');
-      typography.style.cssText = `
-        text-align: center !important;
-        text-transform: none !important;
-      `;
-
-      const speedText = document.createElement('span');
-      speedText.style.cssText = `
-        color: ${textColor} !important;
-        text-decoration: underline !important;
-        text-underline-offset: 5px !important;
-        text-decoration-color: ${this.currentTheme === 'dark' ? 'rgba(170, 170, 170, 0.4)' : 'rgba(29, 29, 29, 0.4)'} !important;
-        cursor: inherit !important;
-        display: inline !important;
-        font-size: ${this.UI_FONT_SIZE} !important;
-      `;
-      speedText.textContent = speedOption.text;
-
-      typography.appendChild(speedText);
-      speedItem.appendChild(typography);
-
-      speedItem.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-        this.selectSpeed(speedOption);
-        this.hideSpeedMenu();
-      });
-
-      speedItem.addEventListener('mouseenter', () => {
-        speedItem.style.backgroundColor = 'rgba(139, 69, 19, 0.1) !important';
-      });
-
-      speedItem.addEventListener('mouseleave', () => {
-        speedItem.style.backgroundColor = 'transparent !important';
-      });
-
-      this.speedMenuPopup.appendChild(speedItem);
-    });
-
-    const bottomSpacer = document.createElement('div');
-    bottomSpacer.style.cssText = 'height: 24px !important;';
-    this.speedMenuPopup.appendChild(bottomSpacer);
-
-    this.speedMenuBackdrop = document.createElement('div');
-    this.speedMenuBackdrop.id = 'tts-speed-menu-backdrop';
-    this.speedMenuBackdrop.style.cssText = `
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
-      background: transparent !important;
-      z-index: 99999 !important;
-    `;
-
-    if (this.speedMenuBackdrop) {
-      this.speedMenuBackdrop.addEventListener('click', () => {
-        this.hideSpeedMenu();
-      });
-    }
-
-    document.body.appendChild(this.speedMenuBackdrop);
-    document.body.appendChild(this.speedMenuPopup);
-
-    setTimeout(() => {
-      document.addEventListener('click', this.handleSpeedMenuOutsideClick.bind(this));
-    }, 100);
+    return showSpeedMenu(this);
   }
 
   hideSpeedMenu() {
-    if (this.speedMenuPopup) {
-      this.speedMenuPopup.style.animation = 'slideOut 0.2s ease forwards !important';
-      setTimeout(() => {
-        if (this.speedMenuPopup && this.speedMenuPopup.parentNode) {
-          this.speedMenuPopup.parentNode.removeChild(this.speedMenuPopup);
-        }
-        this.speedMenuPopup = null;
-        if (this.speedMenuBackdrop) {
-          this.speedMenuBackdrop.remove();
-          this.speedMenuBackdrop = null;
-        }
-      }, 200);
-    }
-
-    document.removeEventListener('click', this.handleSpeedMenuOutsideClick.bind(this));
+    return hideSpeedMenu(this);
   }
 
   handleSpeedMenuOutsideClick(event) {
-    if (this.speedMenuPopup && !this.speedMenuPopup.contains(event.target)) {
-      this.hideSpeedMenu();
-    }
+    return handleSpeedMenuOutsideClick(this, event);
   }
 
   async selectSpeed(speedOption) {
-    const previousSpeed = this.playbackSpeed;
-    this.playbackSpeed = speedOption.speed;
-
-    await this.saveSpeedSetting(speedOption.speed);
-
-
-    this.hideSpeedMenu();
-
-    this.updateBottomFloatingUIState();
-
-    if (previousSpeed !== this.playbackSpeed) {
-      this.handleVoiceOrSpeedChange();
-    }
+    return selectSpeed(this, speedOption);
   }
 
   updateFloatingBarBorder(mode) {
@@ -6024,240 +5715,19 @@ class TTSManager {
   }
 
   showVoiceMenu() {
-    if (this.voiceMenuPopup) {
-      this.voiceMenuPopup.remove();
-    }
-      if (this.voiceMenuBackdrop) {
-        this.voiceMenuBackdrop.remove();
-    }
-
-    const isDark = this.currentTheme === 'dark';
-    const bgColor = isDark ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)';
-    const textColor = isDark ? 'rgba(255, 255, 255, 0.6)' : '#1d1d1d';
-    const borderColor = isDark ? 'rgba(255, 255, 255, 1.0)' : 'rgba(29, 29, 29, 0.3)';
-
-    this.voiceMenuPopup = document.createElement('div');
-    this.voiceMenuPopup.id = 'tts-voice-menu-popup';
-    this.voiceMenuPopup.style.cssText = `
-      position: fixed !important;
-      bottom: 0 !important;
-      left: 50% !important;
-      transform: translate(-50%, 0) !important;
-      width: 40% !important;
-      min-height: 40vh !important;
-      max-height: 60vh !important;
-      background: ${bgColor} !important;
-      backdrop-filter: blur(10px) !important;
-      -webkit-backdrop-filter: blur(10px) !important;
-      border: none !important;
-      border-radius: 0 !important;
-      box-shadow: 0px 0px 60px rgba(125,125,125,.5) !important;
-      z-index: 2147483647 !important;
-      line-height: 1.5rem !important;
-      padding: 0 !important;
-      overflow-y: auto !important;
-      -ms-overflow-style: none !important;
-      scrollbar-width: none !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      animation: slideIn 0.7s ease forwards !important;
-    `;
-
-    if (!document.getElementById('tts-voice-menu-keyframes')) {
-      const style = document.createElement('style');
-      style.id = 'tts-voice-menu-keyframes';
-      style.textContent = `
-        @keyframes slideIn {
-          0% { transform: translate(-50%, calc(100% + 80px)) rotate(0deg); opacity: 1; }
-          100% { transform: translate(-50%, 0) rotate(0deg); opacity: 1; }
-        }
-        @keyframes slideOut {
-          0% { transform: translate(-50%, 0) rotate(0deg); visibility: visible; opacity: 1; }
-          99.9% { transform: translate(-50%, calc(100% + 80px)) rotate(0deg); visibility: visible; opacity: 1; }
-          100% { transform: translate(-50%, calc(100% + 80px)) rotate(0deg); visibility: hidden; opacity: 1; }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
-    this.voiceMenuPopup.style.setProperty('-webkit-scrollbar', 'none', 'important');
-
-    const title = document.createElement('div');
-    title.style.cssText = `
-      margin-bottom: 24px !important;
-      font-weight: 400 !important;
-      -webkit-text-stroke: 0.03em !important;
-      paint-order: stroke fill !important;
-      color: ${textColor} !important;
-      padding: 24px 24px 0 24px !important;
-      text-align: left !important;
-      text-transform: none !important;
-              font-size: ${this.UI_FONT_SIZE} !important;
-    `;
-    title.textContent = 'Voice';
-    this.voiceMenuPopup.appendChild(title);
-
-      this.VOICES.forEach((voice) => {
-      const voiceOption = document.createElement('div');
-        voiceOption.setAttribute('data-voice-id', voice.id);
-      voiceOption.style.cssText = `
-        padding: 5px 24px 10px 24px !important;
-        cursor: pointer !important;
-        border-radius: 8px !important;
-        -webkit-tap-highlight-color: rgba(139, 69, 19, 0.1) !important;
-        transition: background-color 0.2s !important;
-      `;
-
-      const typography = document.createElement('div');
-      typography.style.cssText = `
-        text-align: left !important;
-        text-transform: none !important;
-      `;
-
-      const voiceName = document.createElement('span');
-      voiceName.style.cssText = `
-        color: ${textColor} !important;
-        text-decoration: underline !important;
-        text-underline-offset: 5px !important;
-        text-decoration-color: ${this.currentTheme === 'dark' ? 'rgba(170, 170, 170, 0.4)' : 'rgba(29, 29, 29, 0.4)'} !important;
-        cursor: inherit !important;
-        display: inline !important;
-        font-size: ${this.UI_FONT_SIZE} !important;
-      `;
-      voiceName.textContent = voice.name;
-
-      const voiceDescription = document.createElement('span');
-      voiceDescription.style.cssText = `
-        color: ${this.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : textColor} !important;
-        white-space: pre-line !important;
-        cursor: default !important;
-        font-size: ${this.UI_FONT_SIZE} !important;
-        font-weight: 300 !important;
-      `;
-
-      voiceDescription.textContent = ' ' + voice.description;
-
-      typography.appendChild(voiceName);
-      typography.appendChild(voiceDescription);
-      voiceOption.appendChild(typography);
-
-      voiceOption.addEventListener('mousedown', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-
-        if (voiceOption.dataset.processing === 'true') {
-          return;
-        }
-
-        voiceOption.dataset.processing = 'true';
-
-        try {
-          await this.handleVoiceSelectGlobal(voice);
-        } finally {
-          setTimeout(() => {
-            voiceOption.dataset.processing = 'false';
-          }, 100);
-        }
-      });
-
-      voiceOption.addEventListener('mouseenter', () => {
-        voiceOption.style.backgroundColor = 'rgba(139, 69, 19, 0.1) !important';
-      });
-
-      voiceOption.addEventListener('mouseleave', () => {
-        voiceOption.style.backgroundColor = 'transparent !important';
-      });
-
-      this.voiceMenuPopup.appendChild(voiceOption);
-    });
-
-    const bottomSpacer = document.createElement('div');
-    bottomSpacer.style.cssText = 'height: 30px !important;';
-    this.voiceMenuPopup.appendChild(bottomSpacer);
-
-    this.voiceMenuBackdrop = document.createElement('div');
-    this.voiceMenuBackdrop.id = 'tts-voice-menu-backdrop';
-    this.voiceMenuBackdrop.style.cssText = `
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
-      background: transparent !important;
-      z-index: 99999 !important;
-    `;
-
-    if (this.voiceMenuBackdrop) {
-      this.voiceMenuBackdrop.addEventListener('click', () => {
-        this.hideVoiceMenu();
-      });
-    }
-
-    document.body.appendChild(this.voiceMenuBackdrop);
-    document.body.appendChild(this.voiceMenuPopup);
-
-    setTimeout(() => {
-      if (this.handleVoiceMenuOutsideClick) {
-      document.addEventListener('click', this.handleVoiceMenuOutsideClick.bind(this));
-      }
-    }, 0);
+    return showVoiceMenu(this);
   }
 
   handleVoiceMenuOutsideClick(event) {
-    if (!this.voiceMenuPopup || !this.voiceMenuBackdrop) return;
-
-    if (this.voiceMenuPopup.contains(event.target) ||
-        this.voiceMenuBackdrop.contains(event.target)) {
-      return;
-    }
-
-    this.hideVoiceMenu();
-    document.removeEventListener('click', this.handleVoiceMenuOutsideClick.bind(this));
+    return handleVoiceMenuOutsideClick(this, event);
   }
 
   hideVoiceMenu() {
-    if (this.voiceMenuPopup) {
-      this.voiceMenuPopup.style.animation = 'slideOut 0.2s ease forwards !important';
-
-      setTimeout(() => {
-        if (this.voiceMenuPopup) {
-          this.voiceMenuPopup.remove();
-          this.voiceMenuPopup = null;
-        }
-        if (this.voiceMenuBackdrop) {
-          this.voiceMenuBackdrop.remove();
-          this.voiceMenuBackdrop = null;
-        }
-      }, 200);
-    }
-
-    if (this.handleVoiceMenuOutsideClick) {
-      try {
-        document.removeEventListener('click', this.handleVoiceMenuOutsideClick.bind(this));
-      } catch (e) {
-        // Silently ignore if binding fails
-      }
-    }
+    return hideVoiceMenu(this);
   }
 
   async selectVoice(voice) {
-    const previousVoiceId = this.selectedVoice.id;
-    this.selectedVoice = voice;
-
-    await this.saveVoiceSetting(voice);
-
-
-    if (previousVoiceId !== voice.id) {
-      this.handleVoiceOrSpeedChange();
-    }
-
-    this.updateBottomFloatingUIState();
-
-    if (this.voiceMenuPopup) {
-      this.updateVoiceMenuSelection(voice.id);
-    }
-
-    this.updateStatus(`Voice changed: ${voice.name}`, '#4CAF50');
+    return selectVoice(this, voice);
   }
 
   async handleVoiceOrSpeedChange(context = 'voice_change') {
@@ -6274,68 +5744,19 @@ class TTSManager {
 
 
   clearAllAudio() {
-
-    if (this.abortController) {
-      this.abortController.abort();
-    }
-    this.abortController = new AbortController();
-
-    if (this.currentPlayList) {
-      this.currentPlayList.forEach(take => {
-        take.audioUrl = null;
-      });
-    }
-
+    return clearAllAudio(this);
   }
 
   updateVoiceMenuSelection(selectedVoiceId) {
-    if (!this.voiceMenuPopup) return;
-
-    const voiceOptions = this.voiceMenuPopup.querySelectorAll('div[data-voice-id]');
-    voiceOptions.forEach(option => {
-      const voiceId = option.dataset.voiceId;
-      const voiceName = option.querySelector('span');
-
-      if (voiceId === selectedVoiceId) {
-        option.style.background = 'rgba(255, 255, 255, 0.1) !important';
-        if (voiceName) {
-          voiceName.style.color = '#4CAF50 !important';
-        }
-      } else {
-        option.style.background = 'transparent !important';
-        if (voiceName) {
-          voiceName.style.color = 'white !important';
-        }
-      }
-    });
+    return updateVoiceMenuSelection(this, selectedVoiceId);
   }
 
   pausePlayback() {
-    if (this.isGenerating) {
-      return;
-    }
-
-    if (this.currentAudio) {
-      this.currentAudio.pause();
-      this.isPaused = true;
-      this.isPlaying = true;
-      this.updateBottomFloatingUIState();
-      this.updateStatus('Paused', '#FF9800');
-    }
+    return pausePlayback(this);
   }
 
   resumePlayback() {
-    if (this.isGenerating) {
-      return;
-    }
-
-    if (this.currentAudio && this.isPaused) {
-      this.currentAudio.play();
-      this.isPaused = false;
-      this.isPlaying = true;
-      this.updateBottomFloatingUIState();
-      this.updateStatus(`Playing... (${this.currentPlayListIndex + 1}/${this.currentPlayList.length})`, '#4CAF50');
-    }
+    return resumePlayback(this);
   }
 
   async startTTS(text, elementMetadata = null) {
@@ -7845,38 +7266,7 @@ class TTSManager {
   }
 
   stopAll() {
-
-    if (this.abortController) {
-      this.abortController.abort();
-    }
-    this.abortController = new AbortController();
-
-    if (this.currentAudio) {
-      this.currentAudio.pause();
-      this.currentAudio.currentTime = 0;
-      this.currentAudio = null;
-    }
-
-    this.stopWordTracking();
-    this.unwrapWords();
-
-    this.isPlaying = false;
-    this.isPaused = false;
-    this.isGenerating = false;
-    this.currentGeneratingTakeId = null;
-    this.currentTakeIndex = 0;
-    this.currentTakeWordElements = [];
-    this.currentTakeWords = [];
-
-    this.lastTakeEndPosition = undefined;
-    this.cachedContainer = null;
-
-    this.takes = [];
-
-    this.updateStatus('Stopped', '#FF5722');
-    this.updateProgress(0);
-
-    setTimeout(() => this.hideUI(), 2000);
+    return stopAll(this);
   }
 
 
