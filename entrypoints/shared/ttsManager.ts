@@ -104,8 +104,8 @@ class TTSManager {
     this.speedStep = 0.2;
 
     this.SPEED_OPTIONS = [
+      { speed: 1.4, text: '1.4x' },
       { speed: 1.2, text: '1.2x' },
-      { speed: 1.1, text: '1.1x' },
       { speed: 1.0, text: '1.0x' },
       { speed: 0.9, text: '0.9x' }
     ];

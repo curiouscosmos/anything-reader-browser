@@ -51,7 +51,7 @@ const VOICES_BY_MODEL: Record<TtsModel, VoiceOption[]> = {
 };
 
 const DEFAULT_SPEED = 1.0;
-const SPEED_OPTION_VALUES = ['1.2', '1.1', '1.0', '0.9'] as const;
+const SPEED_OPTION_VALUES = ['1.4', '1.2', '1.0', '0.9'] as const;
 const DEFAULT_MODEL: TtsModel = 'kitten';
 const HIGHLIGHT_COLOR_BASE = ['#d8ccad', '#6789ca', '#594743', '#504e49', '#a4a199', '#e5b560', '#941e34', '#bc6f25', '#455f54'];
 const DEFAULT_HIGHLIGHT_COLOR_INDEX = 0;
