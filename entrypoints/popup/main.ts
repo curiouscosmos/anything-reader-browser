@@ -50,7 +50,8 @@ const VOICES_BY_MODEL: Record<TtsModel, VoiceOption[]> = {
   supertonic: SUPERTONIC_VOICES,
 };
 
-const DEFAULT_SPEED = 1.2;
+const DEFAULT_SPEED = 1.0;
+const SPEED_OPTION_VALUES = ['1.2', '1.1', '1.0', '0.9'] as const;
 const DEFAULT_MODEL: TtsModel = 'kitten';
 const HIGHLIGHT_COLOR_BASE = ['#d8ccad', '#6789ca', '#594743', '#504e49', '#a4a199', '#e5b560', '#941e34', '#bc6f25', '#455f54'];
 const DEFAULT_HIGHLIGHT_COLOR_INDEX = 0;
@@ -98,7 +99,7 @@ async function initializePopup() {
   voiceSelect.value = savedVoiceId && voices.some((voice) => voice.id === savedVoiceId) ? savedVoiceId : getDefaultVoiceForModel(currentModel).id;
 
   const savedSpeed = Number(settings['ar-speed']);
-  speedSelect.value = Number.isFinite(savedSpeed) && savedSpeed > 0 ? String(savedSpeed) : String(DEFAULT_SPEED);
+  speedSelect.value = getSpeedSelectValue(savedSpeed);
 
   const savedHighlightColorIndex = Number(settings['ar-highlight-color']);
   renderHighlightColorPicker(Number.isInteger(savedHighlightColorIndex) ? savedHighlightColorIndex : DEFAULT_HIGHLIGHT_COLOR_INDEX);
@@ -151,7 +152,7 @@ async function syncLiveReaderSettings() {
       voiceSelect.value = response.voiceId;
     }
     if (typeof response.speed === 'number' && Number.isFinite(response.speed)) {
-      speedSelect.value = String(response.speed);
+      speedSelect.value = getSpeedSelectValue(response.speed);
     }
   } catch {
     // Some pages cannot receive content-script messages; storage values remain the fallback.
@@ -267,6 +268,17 @@ async function getActiveTab() {
 function setStatus(message: string, isError = false) {
   statusText.textContent = message;
   statusText.dataset.state = isError ? 'error' : 'ok';
+}
+
+function getSpeedSelectValue(speed: unknown) {
+  const numericSpeed = typeof speed === 'number' ? speed : Number(speed);
+  if (!Number.isFinite(numericSpeed)) {
+    return String(DEFAULT_SPEED);
+  }
+
+  const normalized = Math.round(numericSpeed * 10) / 10;
+  const candidate = normalized.toFixed(1);
+  return (SPEED_OPTION_VALUES as readonly string[]).includes(candidate) ? candidate : String(DEFAULT_SPEED);
 }
 
 function getElement(id: string) {

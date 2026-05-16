@@ -359,11 +359,18 @@ export function populatePlayerDockSpeedSelect(manager: PlayerDockManager) {
   manager.speedSelect.replaceChildren();
   manager.SPEED_OPTIONS.forEach((speedOption) => {
     const option = document.createElement('option');
-    option.value = String(speedOption.speed);
-    option.textContent = speedOption.text;
+    option.value = speedOption.speed.toFixed(1);
+    option.textContent = speedOption.text.endsWith('x') ? speedOption.text : `${speedOption.text}x`;
     manager.speedSelect?.appendChild(option);
   });
-  manager.speedSelect.value = String(manager.playbackSpeed);
+  const selectedSpeed = getSpeedSelectValue(manager.playbackSpeed);
+  const hasMatchingOption = Array.from(manager.speedSelect.options).some((option) => option.value === selectedSpeed);
+  manager.speedSelect.value = hasMatchingOption ? selectedSpeed : '1.0';
+}
+
+function getSpeedSelectValue(speed: number) {
+  const candidate = Math.round(speed * 10) / 10;
+  return candidate.toFixed(1);
 }
 
 export function updatePlayerDockState(manager: PlayerDockManager) {

@@ -92,7 +92,7 @@ class TTSManager {
 
 
     this.selectedVoice = this.VOICES[2];
-    this.playbackSpeed = 1.2;
+    this.playbackSpeed = 1.0;
     this.quality = 'Balanced';
 
     this.loadSettingsAsync().then(() => {
@@ -104,10 +104,10 @@ class TTSManager {
     this.speedStep = 0.2;
 
     this.SPEED_OPTIONS = [
-      { speed: 1.4, text: 'Fast' },
-      { speed: 1.2, text: 'A bit fast' },
-      { speed: 1.0, text: 'Normal' },
-      { speed: 0.9, text: 'A bit slow' }
+      { speed: 1.2, text: '1.2x' },
+      { speed: 1.1, text: '1.1x' },
+      { speed: 1.0, text: '1.0x' },
+      { speed: 0.9, text: '0.9x' }
     ];
 
     this.UI_FONT_SIZE = '16px';
