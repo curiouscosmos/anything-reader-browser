@@ -1,4 +1,5 @@
 import { READ_CURRENT_PAGE_MESSAGE, type ReadResult } from '@/lib/native-messaging.ts';
+import config from '../../config/config.ts';
 import './style.css';
 
 type VoiceOption = {
@@ -56,6 +57,7 @@ const SPEED_OPTION_VALUES = ['1.4', '1.2', '1.0', '0.9'] as const;
 const DEFAULT_MODEL: TtsModel = 'kitten';
 const HIGHLIGHT_COLOR_BASE = ['#d8ccad', '#6789ca', '#594743', '#504e49', '#a4a199', '#e5b560', '#941e34', '#bc6f25', '#455f54'];
 const DEFAULT_HIGHLIGHT_COLOR_INDEX = 0;
+const DEBUG_PREFIX = '[Anything Reader][Popup]';
 
 const enabledToggle = getInput('enabled-toggle');
 const barToggle = getInput('bar-toggle');
@@ -66,6 +68,7 @@ const voiceSelect = getSelect('voice-select');
 const speedSelect = getSelect('speed-select');
 const highlightColorPicker = getElement('highlight-color-picker');
 const statusText = getElement('status-text');
+const nativeActionsSection = getElement('native-actions-section');
 const readWithMacAppButton = getButton('read-with-mac-app');
 const summarizeWithMacAppButton = getButton('summarize-with-mac-app');
 
@@ -106,6 +109,12 @@ async function initializePopup() {
 
   const savedHighlightColorIndex = Number(settings['ar-highlight-color']);
   renderHighlightColorPicker(Number.isInteger(savedHighlightColorIndex) ? savedHighlightColorIndex : DEFAULT_HIGHLIGHT_COLOR_INDEX);
+
+  const showNativeSection = shouldShowNativeMessagingSection();
+  console.log(DEBUG_PREFIX, 'Native messaging section visibility', {
+    showNativeSection,
+  });
+  nativeActionsSection.hidden = !showNativeSection;
 
   await syncLiveReaderSettings();
 
@@ -334,6 +343,57 @@ function getSelect(id: string) {
 
 function getButton(id: string) {
   return getElement(id) as HTMLButtonElement;
+}
+
+function shouldShowNativeMessagingSection() {
+  const isMac = isMacPlatform();
+  const browserName = getBrowserName();
+
+  console.log(DEBUG_PREFIX, 'Native messaging visibility checks', {
+    isMac,
+    browserName,
+    showOnChrome: config.nativeHostMessaging.showOnChrome,
+    showOnFirefox: config.nativeHostMessaging.showOnFirefox,
+  });
+
+  if (!isMac) {
+    return false;
+  }
+  if (browserName === 'chrome') {
+    return config.nativeHostMessaging.showOnChrome;
+  }
+
+  if (browserName === 'firefox') {
+    return config.nativeHostMessaging.showOnFirefox;
+  }
+
+  return false;
+}
+
+function isMacPlatform() {
+  const result = /Mac/i.test(navigator.userAgent) || /Mac/i.test(navigator.platform);
+  console.log(DEBUG_PREFIX, 'OS detection result', {
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    isMac: result,
+  });
+  return result;
+}
+
+function getBrowserName() {
+  const userAgent = navigator.userAgent.toLowerCase();
+  if (userAgent.includes('firefox')) {
+    console.log(DEBUG_PREFIX, 'Browser detection result', { browserName: 'firefox', userAgent: navigator.userAgent });
+    return 'firefox' as const;
+  }
+
+  if (userAgent.includes('chrome') || userAgent.includes('chromium') || userAgent.includes('edg/')) {
+    console.log(DEBUG_PREFIX, 'Browser detection result', { browserName: 'chrome', userAgent: navigator.userAgent });
+    return 'chrome' as const;
+  }
+
+  console.log(DEBUG_PREFIX, 'Browser detection result', { browserName: 'other', userAgent: navigator.userAgent });
+  return 'other' as const;
 }
 
 function increaseSaturation(hex: string, percent = 30) {
