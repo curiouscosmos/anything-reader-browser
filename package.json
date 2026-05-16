@@ -2,7 +2,7 @@
   "name": "anything-reader",
   "description": "manifest.json description",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "assets:build": "node scripts/build-assets.mjs",
@@ -11,6 +11,7 @@
     "build": "yarn assets:build && wxt build",
     "build:firefox": "yarn assets:build && wxt build -b firefox",
     "zip": "yarn assets:build && wxt zip",
+    "zip:webstore": "CHROME_WEBSTORE=true yarn assets:build && CHROME_WEBSTORE=true wxt zip",
     "zip:firefox": "yarn assets:build && wxt zip -b firefox",
     "compile": "yarn assets:build && tsc --noEmit",
     "test": "node scripts/run-tests.mjs",
