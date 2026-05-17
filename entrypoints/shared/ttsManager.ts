@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { isFirefoxRuntime } from '@/lib/browser-flavor.ts';
 import { EXTRACT_READABLE_TEXT_MESSAGE } from '@/lib/native-messaging.ts';
 import { extractReadableTextFromDocument } from '@/lib/readable-text.ts';
 import {
@@ -47,6 +48,7 @@ import {
 class TTSManager {
   constructor() {
     this.DEBUG_MODE = false;
+    this.isFirefoxOnlyKitten = isFirefoxRuntime();
 
     this.SUPERTONIC_VOICES = [
       { name: 'Jenifer', id: 'F1', key: '1', description: `is a calm female voice with a slightly low tone; steady and composed.` },
@@ -1882,6 +1884,17 @@ class TTSManager {
   async loadTtsModelSetting() {
     return new Promise((resolve) => {
       try {
+        if (this.isFirefoxOnlyKitten) {
+          try {
+            chrome.storage.sync.set({ 'ar-tts-model': 'kitten' });
+            localStorage.setItem('ar-tts-model', JSON.stringify('kitten'));
+          } catch (error) {
+            this.warn('Failed to persist Firefox Kitten-only model setting:', error);
+          }
+          resolve('kitten');
+          return;
+        }
+
         chrome.storage.sync.get(['ar-tts-model'], (result) => {
           if (result['ar-tts-model']) {
             resolve(this.normalizeTtsModel(result['ar-tts-model']));
@@ -1908,15 +1921,19 @@ class TTSManager {
   }
 
   normalizeTtsModel(model) {
+    if (this.isFirefoxOnlyKitten) {
+      return 'kitten';
+    }
+
     return model === 'supertonic' ? 'supertonic' : 'kitten';
   }
 
   applyVoiceCatalogForModel() {
-    this.VOICES = this.ttsModel === 'supertonic' ? this.SUPERTONIC_VOICES : this.KITTEN_VOICES;
+    this.VOICES = this.isFirefoxOnlyKitten || this.ttsModel !== 'supertonic' ? this.KITTEN_VOICES : this.SUPERTONIC_VOICES;
   }
 
   getDefaultVoiceForModel() {
-    return this.ttsModel === 'supertonic' ? this.SUPERTONIC_VOICES[2] : this.KITTEN_VOICES[2];
+    return this.isFirefoxOnlyKitten || this.ttsModel !== 'supertonic' ? this.KITTEN_VOICES[2] : this.SUPERTONIC_VOICES[2];
   }
 
   async saveSpeedSetting(speed) {

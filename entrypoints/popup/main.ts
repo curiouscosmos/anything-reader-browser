@@ -1,5 +1,6 @@
 import { READ_CURRENT_PAGE_MESSAGE, type ReadResult } from '@/lib/native-messaging.ts';
 import config from '../../config/config.ts';
+import { isFirefoxRuntime } from '@/lib/browser-flavor.ts';
 import './style.css';
 
 type VoiceOption = {
@@ -68,11 +69,13 @@ const voiceSelect = getSelect('voice-select');
 const speedSelect = getSelect('speed-select');
 const highlightColorPicker = getElement('highlight-color-picker');
 const statusText = getElement('status-text');
+const modelSection = getElement('model-section');
 const nativeActionsSection = getElement('native-actions-section');
 const readWithMacAppButton = getButton('read-with-mac-app');
 const summarizeWithMacAppButton = getButton('summarize-with-mac-app');
 
 let currentModel: TtsModel = DEFAULT_MODEL;
+const firefoxOnlyKitten = isFirefoxRuntime();
 
 initializePopup().catch((error) => {
   setStatus(error instanceof Error ? error.message : String(error), true);
@@ -96,6 +99,12 @@ async function initializePopup() {
   highlightToggle.checked = settings['ar-highlight-enabled'] !== false;
 
   currentModel = normalizeTtsModel(settings['ar-tts-model']);
+  if (firefoxOnlyKitten) {
+    currentModel = 'kitten';
+    await browser.storage.sync.set({
+      'ar-tts-model': 'kitten',
+    });
+  }
   modelSelect.value = currentModel;
   renderVoices(currentModel);
 
@@ -114,6 +123,7 @@ async function initializePopup() {
   console.log(DEBUG_PREFIX, 'Native messaging section visibility', {
     showNativeSection,
   });
+  modelSection.hidden = firefoxOnlyKitten;
   nativeActionsSection.hidden = !showNativeSection;
 
   await syncLiveReaderSettings();
@@ -250,6 +260,26 @@ function renderVoices(model: TtsModel) {
 }
 
 async function saveModelSetting() {
+  if (firefoxOnlyKitten) {
+    currentModel = 'kitten';
+    modelSelect.value = 'kitten';
+    renderVoices('kitten');
+    const voice = getDefaultVoiceForModel('kitten');
+    voiceSelect.value = voice.id;
+    await browser.storage.sync.set({
+      'ar-tts-model': 'kitten',
+      'ar-voice': {
+        id: voice.id,
+        name: voice.name,
+        key: voice.key,
+        isCustom: false,
+        isTemp: false,
+      },
+    });
+    setStatus(`Model: ${modelSelect.options[modelSelect.selectedIndex]?.text ?? currentModel}`);
+    return;
+  }
+
   currentModel = normalizeTtsModel(modelSelect.value);
   renderVoices(currentModel);
   const voice = getDefaultVoiceForModel(currentModel);
@@ -287,14 +317,26 @@ async function saveVoiceSetting() {
 }
 
 function normalizeTtsModel(model: unknown): TtsModel {
+  if (firefoxOnlyKitten) {
+    return 'kitten';
+  }
+
   return model === 'supertonic' ? 'supertonic' : 'kitten';
 }
 
 function getVoicesForModel(model: TtsModel) {
+  if (firefoxOnlyKitten) {
+    return KITTEN_VOICES;
+  }
+
   return VOICES_BY_MODEL[model];
 }
 
 function getDefaultVoiceForModel(model: TtsModel) {
+  if (firefoxOnlyKitten) {
+    return KITTEN_VOICES[2];
+  }
+
   return model === 'supertonic' ? SUPERTONIC_VOICES[2] : KITTEN_VOICES[2];
 }
 

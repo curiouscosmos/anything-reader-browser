@@ -7,6 +7,8 @@ const sourceDirs = [
   path.resolve('entrypoints/shared'),
 ];
 const publicAssetsDir = path.resolve('assets-built');
+const isFirefoxBuild = process.env.TARGET_BROWSER === 'firefox';
+const onnxRuntimeDistDir = path.resolve('node_modules/onnxruntime-web/dist');
 
 await rm(publicAssetsDir, { recursive: true, force: true });
 await mkdir(publicAssetsDir, { recursive: true });
@@ -18,6 +20,22 @@ for (const sourceDir of sourceDirs) {
 
   for (const file of files) {
     if (file === '.DS_Store' || file.endsWith('.js')) {
+      continue;
+    }
+
+    if (isFirefoxBuild && sourceDir.endsWith(`${path.sep}assets`) && file === 'supertonic') {
+      const firefoxSupertonicOrtDir = path.join(publicAssetsDir, 'supertonic', 'ort');
+      await mkdir(firefoxSupertonicOrtDir, { recursive: true });
+      await Promise.all([
+        cp(
+          path.join(onnxRuntimeDistDir, 'ort-wasm-simd-threaded.mjs'),
+          path.join(firefoxSupertonicOrtDir, 'ort-wasm-simd-threaded.mjs'),
+        ),
+        cp(
+          path.join(onnxRuntimeDistDir, 'ort-wasm-simd-threaded.wasm'),
+          path.join(firefoxSupertonicOrtDir, 'ort-wasm-simd-threaded.wasm'),
+        ),
+      ]);
       continue;
     }
 

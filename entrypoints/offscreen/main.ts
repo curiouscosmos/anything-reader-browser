@@ -1,11 +1,18 @@
 import { createSupertonicTtsEngine, type TtsAction, type TtsGenerateData } from '@/lib/tts-engine.ts';
+import { getKittenOrtWasmPaths } from '@/lib/ort-runtime.ts';
 
 const ttsEngine = createSupertonicTtsEngine({
   debugPrefix: '[Anything Reader][Offscreen]',
   modelRoot: browser.runtime.getURL('supertonic/onnx' as never),
   voiceStyleRoot: browser.runtime.getURL('supertonic/voice_styles' as never),
   kittenRoot: browser.runtime.getURL('kittenTTS' as never),
-  ortWasmRoot: browser.runtime.getURL('supertonic/ort/' as never),
+  ortWasmRoot: getKittenOrtWasmPaths(
+    browser.runtime.getURL('supertonic/ort/' as never),
+    {
+      mjs: browser.runtime.getURL('supertonic/ort/ort-wasm-simd-threaded.mjs' as never),
+      wasm: browser.runtime.getURL('supertonic/ort/ort-wasm-simd-threaded.wasm' as never),
+    },
+  ),
   primaryExecutionProviders: ['webgpu', 'wasm'],
   fallbackExecutionProviders: ['wasm'],
 });

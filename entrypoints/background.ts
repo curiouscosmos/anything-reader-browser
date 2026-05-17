@@ -1,4 +1,6 @@
 import type { TtsAction } from '@/lib/tts-engine.ts';
+import { isFirefoxRuntime } from '@/lib/browser-flavor.ts';
+import { getKittenOrtWasmPaths } from '@/lib/ort-runtime.ts';
 import {
   clampText,
   describeTabMessageError,
@@ -307,13 +309,21 @@ async function sendTtsMessage(action: TtsAction, data?: unknown) {
 
 async function getBackgroundTtsEngine() {
   if (!backgroundTtsEngine) {
+    const ortWasmRoot = getKittenOrtWasmPaths(
+      browser.runtime.getURL('supertonic/ort/' as never),
+      {
+        mjs: browser.runtime.getURL('supertonic/ort/ort-wasm-simd-threaded.mjs' as never),
+        wasm: browser.runtime.getURL('supertonic/ort/ort-wasm-simd-threaded.wasm' as never),
+      },
+    );
+
     backgroundTtsEngine = import('@/lib/tts-engine.ts').then(({ createSupertonicTtsEngine }) =>
       createSupertonicTtsEngine({
         debugPrefix: '[Anything Reader][BackgroundTTS]',
         modelRoot: browser.runtime.getURL('supertonic/onnx' as never),
         voiceStyleRoot: browser.runtime.getURL('supertonic/voice_styles' as never),
         kittenRoot: browser.runtime.getURL('kittenTTS' as never),
-        ortWasmRoot: browser.runtime.getURL('supertonic/ort/' as never),
+        ortWasmRoot,
         primaryExecutionProviders: ['wasm'],
         fallbackExecutionProviders: ['wasm'],
       }),
@@ -326,7 +336,7 @@ async function getBackgroundTtsEngine() {
 async function preloadTtsModel() {
   try {
     const settings = await browser.storage.sync.get(['ar-tts-model']);
-    const model = settings['ar-tts-model'] === 'supertonic' ? 'supertonic' : 'kitten';
+    const model = isFirefoxRuntime() ? 'kitten' : settings['ar-tts-model'] === 'supertonic' ? 'supertonic' : 'kitten';
     await sendTtsMessage('tts-initialize', { model });
   } catch (error) {
     console.warn('[Anything Reader][Background] TTS preload failed', error);

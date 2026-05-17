@@ -1,11 +1,12 @@
 import * as ort from 'onnxruntime-web';
+import type { OrtWasmPaths } from '@/lib/ort-runtime.ts';
 
 export const AVAILABLE_LANGS = ['en', 'ko', 'ja', 'ar', 'bg', 'cs', 'da', 'de', 'el', 'es', 'et', 'fi', 'fr', 'hi', 'hr', 'hu', 'id', 'it', 'lt', 'lv', 'nl', 'pl', 'pt', 'ro', 'ru', 'sk', 'sl', 'sv', 'tr', 'uk', 'vi'] as const;
 
-export function configureOnnxRuntime(wasmPath: string) {
+export function configureOnnxRuntime(wasmPaths: OrtWasmPaths) {
   ort.env.logLevel = 'error';
   (ort.env.wasm as typeof ort.env.wasm & { logLevel?: string }).logLevel = 'error';
-  ort.env.wasm.wasmPaths = wasmPath;
+  ort.env.wasm.wasmPaths = wasmPaths as never;
   ort.env.wasm.numThreads = 1;
   ort.env.wasm.proxy = false;
 }

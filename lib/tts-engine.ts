@@ -1,5 +1,7 @@
 import * as ort from 'onnxruntime-web';
 import { phonemize } from 'phonemizer';
+import { isFirefoxRuntime } from '@/lib/browser-flavor.ts';
+import type { OrtWasmPaths } from '@/lib/ort-runtime.ts';
 import { configureOnnxRuntime, loadTextToSpeech, loadVoiceStyle, writeWavFile, type Style, type TextToSpeech } from '@/lib/supertonic.ts';
 
 const DEFAULT_VOICE_ID = 'M1';
@@ -26,7 +28,7 @@ type TtsEngineOptions = {
   modelRoot: string;
   voiceStyleRoot: string;
   kittenRoot: string;
-  ortWasmRoot: string;
+  ortWasmRoot: OrtWasmPaths;
   primaryExecutionProviders: string[];
   fallbackExecutionProviders?: string[];
 };
@@ -530,6 +532,10 @@ const KITTEN_TOKENIZER_VOCAB = new Map<string, number>([
 ]);
 
 function normalizeModel(model: unknown): TtsModel {
+  if (isFirefoxRuntime()) {
+    return 'kitten';
+  }
+
   return model === 'supertonic' ? 'supertonic' : 'kitten';
 }
 

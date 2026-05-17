@@ -34,7 +34,10 @@ export default defineConfig({
     ],
     web_accessible_resources: [
       {
-        resources: ['icon*.png', 'speaker.svg', 'kittenTTS/*', 'supertonic/onnx/*', 'supertonic/ort/*', 'reader.html', 'reader.js', 'reader-init.js', 'supertonic/voice_styles/*'],
+        resources:
+          browser === 'firefox'
+            ? ['icon*.png', 'speaker.svg', 'kittenTTS/*', 'supertonic/ort/*', 'reader.html', 'reader.js', 'reader-init.js']
+            : ['icon*.png', 'speaker.svg', 'kittenTTS/*', 'supertonic/onnx/*', 'supertonic/ort/*', 'reader.html', 'reader.js', 'reader-init.js', 'supertonic/voice_styles/*'],
         matches: ['<all_urls>'],
       },
     ],

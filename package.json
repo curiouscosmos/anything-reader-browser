@@ -7,12 +7,12 @@
   "scripts": {
     "assets:build": "node scripts/build-assets.mjs",
     "dev": "yarn assets:build && wxt",
-    "dev:firefox": "yarn assets:build && wxt -b firefox",
+    "dev:firefox": "TARGET_BROWSER=firefox yarn assets:build && wxt -b firefox",
     "build": "yarn assets:build && wxt build",
-    "build:firefox": "yarn assets:build && wxt build -b firefox",
+    "build:firefox": "TARGET_BROWSER=firefox yarn assets:build && wxt build -b firefox",
     "zip": "yarn assets:build && wxt zip",
     "zip:webstore": "yarn assets:build && yarn wxt zip -m webstore",
-    "zip:firefox": "yarn assets:build && wxt zip -b firefox",
+    "zip:firefox": "TARGET_BROWSER=firefox yarn assets:build && wxt zip -b firefox",
     "compile": "yarn assets:build && tsc --noEmit",
     "test": "node scripts/run-tests.mjs",
     "postinstall": "wxt prepare"
