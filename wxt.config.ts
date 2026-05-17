@@ -3,7 +3,7 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   publicDir: 'assets-built',
-  manifest: ({ browser }) => ({
+  manifest: ({ browser, mode }) => ({
     permissions:
       browser === 'firefox'
         ? ['activeTab', 'contextMenus', 'nativeMessaging', 'storage', 'tabs']
@@ -38,7 +38,7 @@ export default defineConfig({
         matches: ['<all_urls>'],
       },
     ],
-    ...(process.env.CHROME_WEBSTORE === 'true'
+    ...(mode === 'webstore'
       ? {}
       : {
           // Fixed Chrome manifest key so the extension ID stays stable across reloads/installations.

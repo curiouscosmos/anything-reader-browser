@@ -11,7 +11,7 @@
     "build": "yarn assets:build && wxt build",
     "build:firefox": "yarn assets:build && wxt build -b firefox",
     "zip": "yarn assets:build && wxt zip",
-    "zip:webstore": "CHROME_WEBSTORE=true yarn assets:build && CHROME_WEBSTORE=true wxt zip",
+    "zip:webstore": "yarn assets:build && yarn wxt zip -m webstore",
     "zip:firefox": "yarn assets:build && wxt zip -b firefox",
     "compile": "yarn assets:build && tsc --noEmit",
     "test": "node scripts/run-tests.mjs",
