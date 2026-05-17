@@ -1,6 +1,6 @@
 {
   "name": "anything-reader",
-  "description": "manifest.json description",
+  "description": "Offline and fully private Text to Speech, read aloud any web page.",
   "private": true,
   "version": "1.0.0",
   "type": "module",

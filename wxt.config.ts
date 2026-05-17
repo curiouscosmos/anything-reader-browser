@@ -4,6 +4,7 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   publicDir: 'assets-built',
   manifest: ({ browser, mode }) => ({
+    name: 'Anything Reader',
     permissions:
       browser === 'firefox'
         ? ['activeTab', 'contextMenus', 'nativeMessaging', 'storage', 'tabs']
