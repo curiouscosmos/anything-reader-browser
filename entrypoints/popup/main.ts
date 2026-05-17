@@ -69,7 +69,8 @@ const voiceSelect = getSelect('voice-select');
 const speedSelect = getSelect('speed-select');
 const highlightColorPicker = getElement('highlight-color-picker');
 const statusText = getElement('status-text');
-const modelSection = getElement('model-section');
+const readerControlsSection = getElement('model-section');
+const modelField = getElement('model-field');
 const nativeActionsSection = getElement('native-actions-section');
 const readWithMacAppButton = getButton('read-with-mac-app');
 const summarizeWithMacAppButton = getButton('summarize-with-mac-app');
@@ -123,7 +124,12 @@ async function initializePopup() {
   console.log(DEBUG_PREFIX, 'Native messaging section visibility', {
     showNativeSection,
   });
-  modelSection.hidden = firefoxOnlyKitten;
+  readerControlsSection.hidden = false;
+  if (firefoxOnlyKitten) {
+    modelField.remove();
+  } else {
+    modelField.hidden = false;
+  }
   nativeActionsSection.hidden = !showNativeSection;
 
   await syncLiveReaderSettings();
