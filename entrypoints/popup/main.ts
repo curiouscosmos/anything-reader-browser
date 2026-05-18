@@ -55,7 +55,7 @@ const VOICES_BY_MODEL: Record<TtsModel, VoiceOption[]> = {
 
 const DEFAULT_SPEED = 1.0;
 const SPEED_OPTION_VALUES = ['1.4', '1.2', '1.0', '0.9'] as const;
-const DEFAULT_MODEL: TtsModel = 'kitten';
+const DEFAULT_MODEL: TtsModel = 'supertonic';
 const HIGHLIGHT_COLOR_BASE = ['#d8ccad', '#6789ca', '#594743', '#504e49', '#a4a199', '#e5b560', '#941e34', '#bc6f25', '#455f54'];
 const DEFAULT_HIGHLIGHT_COLOR_INDEX = 0;
 const DEBUG_PREFIX = '[Anything Reader][Popup]';
@@ -64,13 +64,11 @@ const enabledToggle = getInput('enabled-toggle');
 const barToggle = getInput('bar-toggle');
 const autoScrollToggle = getInput('auto-scroll-toggle');
 const highlightToggle = getInput('highlight-toggle');
-const modelSelect = getSelect('model-select');
 const voiceSelect = getSelect('voice-select');
 const speedSelect = getSelect('speed-select');
 const highlightColorPicker = getElement('highlight-color-picker');
 const statusText = getElement('status-text');
 const readerControlsSection = getElement('model-section');
-const modelField = getElement('model-field');
 const nativeActionsSection = getElement('native-actions-section');
 const readWithMacAppButton = getButton('read-with-mac-app');
 const summarizeWithMacAppButton = getButton('summarize-with-mac-app');
@@ -84,7 +82,6 @@ initializePopup().catch((error) => {
 
 async function initializePopup() {
   const settings = await browser.storage.sync.get([
-    'ar-tts-model',
     'ar-plugin-enabled',
     'ar-floating-bar-visible',
     'ar-auto-scroll',
@@ -99,14 +96,7 @@ async function initializePopup() {
   autoScrollToggle.checked = settings['ar-auto-scroll'] !== false;
   highlightToggle.checked = settings['ar-highlight-enabled'] !== false;
 
-  currentModel = normalizeTtsModel(settings['ar-tts-model']);
-  if (firefoxOnlyKitten) {
-    currentModel = 'kitten';
-    await browser.storage.sync.set({
-      'ar-tts-model': 'kitten',
-    });
-  }
-  modelSelect.value = currentModel;
+  currentModel = firefoxOnlyKitten ? 'kitten' : 'supertonic';
   renderVoices(currentModel);
 
   const savedVoice = settings['ar-voice'] as Partial<VoiceOption> | undefined;
@@ -125,11 +115,6 @@ async function initializePopup() {
     showNativeSection,
   });
   readerControlsSection.hidden = false;
-  if (firefoxOnlyKitten) {
-    modelField.remove();
-  } else {
-    modelField.hidden = false;
-  }
   nativeActionsSection.hidden = !showNativeSection;
 
   await syncLiveReaderSettings();
@@ -138,7 +123,6 @@ async function initializePopup() {
   barToggle.addEventListener('change', () => saveBooleanSetting('ar-floating-bar-visible', barToggle.checked));
   autoScrollToggle.addEventListener('change', () => saveBooleanSetting('ar-auto-scroll', autoScrollToggle.checked));
   highlightToggle.addEventListener('change', () => saveBooleanSetting('ar-highlight-enabled', highlightToggle.checked));
-  modelSelect.addEventListener('change', saveModelSetting);
   voiceSelect.addEventListener('change', saveVoiceSetting);
   speedSelect.addEventListener('change', saveSpeedSetting);
   readWithMacAppButton.addEventListener('click', () => void handleNativeActionClick(false));
@@ -200,7 +184,6 @@ async function syncLiveReaderSettings() {
     }
     if (response.model) {
       currentModel = normalizeTtsModel(response.model);
-      modelSelect.value = currentModel;
       renderVoices(currentModel);
     }
     const liveHighlightColorIndex = response.highlightColorIndex;
@@ -265,44 +248,6 @@ function renderVoices(model: TtsModel) {
   );
 }
 
-async function saveModelSetting() {
-  if (firefoxOnlyKitten) {
-    currentModel = 'kitten';
-    modelSelect.value = 'kitten';
-    renderVoices('kitten');
-    const voice = getDefaultVoiceForModel('kitten');
-    voiceSelect.value = voice.id;
-    await browser.storage.sync.set({
-      'ar-tts-model': 'kitten',
-      'ar-voice': {
-        id: voice.id,
-        name: voice.name,
-        key: voice.key,
-        isCustom: false,
-        isTemp: false,
-      },
-    });
-    setStatus(`Model: ${modelSelect.options[modelSelect.selectedIndex]?.text ?? currentModel}`);
-    return;
-  }
-
-  currentModel = normalizeTtsModel(modelSelect.value);
-  renderVoices(currentModel);
-  const voice = getDefaultVoiceForModel(currentModel);
-  voiceSelect.value = voice.id;
-  await browser.storage.sync.set({
-    'ar-tts-model': currentModel,
-    'ar-voice': {
-      id: voice.id,
-      name: voice.name,
-      key: voice.key,
-      isCustom: false,
-      isTemp: false,
-    },
-  });
-  setStatus(`Model: ${modelSelect.options[modelSelect.selectedIndex]?.text ?? currentModel}`);
-}
-
 async function saveBooleanSetting(key: string, enabled: boolean) {
   await browser.storage.sync.set({ [key]: enabled });
   setStatus('Saved');
@@ -327,7 +272,7 @@ function normalizeTtsModel(model: unknown): TtsModel {
     return 'kitten';
   }
 
-  return model === 'supertonic' ? 'supertonic' : 'kitten';
+  return 'supertonic';
 }
 
 function getVoicesForModel(model: TtsModel) {
@@ -343,7 +288,7 @@ function getDefaultVoiceForModel(model: TtsModel) {
     return KITTEN_VOICES[2];
   }
 
-  return model === 'supertonic' ? SUPERTONIC_VOICES[2] : KITTEN_VOICES[2];
+  return model === 'supertonic' ? SUPERTONIC_VOICES[0] : KITTEN_VOICES[2];
 }
 
 async function saveSpeedSetting() {

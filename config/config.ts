@@ -1,6 +1,6 @@
 export default {
 	nativeHostMessaging: {
-		showOnChrome: true,
-		showOnFirefox: true,
+		showOnChrome: false,
+		showOnFirefox: false,
 	}
 }

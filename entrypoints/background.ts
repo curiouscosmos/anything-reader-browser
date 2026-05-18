@@ -1,6 +1,12 @@
-import type { TtsAction } from '@/lib/tts-engine.ts';
 import { isFirefoxRuntime } from '@/lib/browser-flavor.ts';
 import { getKittenOrtWasmPaths } from '@/lib/ort-runtime.ts';
+import {
+  FIREFOX_TTS_HOST_PAGE,
+  FIREFOX_TTS_HOST_PORT_NAME,
+  FIREFOX_TTS_HOST_READY_MESSAGE,
+  type FirefoxTtsHostRequest,
+  type FirefoxTtsHostResponse,
+} from '@/lib/firefox-tts-host.ts';
 import {
   clampText,
   describeTabMessageError,
@@ -13,8 +19,25 @@ import {
   type ReadResult,
 } from '@/lib/native-messaging.ts';
 
-export default defineBackground(() => {
+type TtsAction = 'tts-initialize' | 'tts-generate' | 'tts-unload' | 'tts-status';
+
+let firefoxTtsHostPort: Browser.runtime.Port | null = null;
+let firefoxTtsHostTabId: number | null = null;
+let firefoxTtsHostReadyPromise: Promise<void> | null = null;
+let resolveFirefoxTtsHostReady: (() => void) | null = null;
+let nextFirefoxTtsRequestId = 1;
+const pendingFirefoxTtsRequests = new Map<number, { resolve: (value: unknown) => void; reject: (reason: unknown) => void }>();
+
+function backgroundMain() {
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (isFirefoxTtsHostReadyMessage(message)) {
+      if (_sender.tab?.id) {
+        firefoxTtsHostTabId = _sender.tab.id;
+        void connectFirefoxTtsHost(_sender.tab.id);
+      }
+      return;
+    }
+
     if (isReadCurrentPageRequest(message)) {
       void readCurrentPageAndSendToMac(message.summarize === true)
         .then(sendResponse)
@@ -109,7 +132,7 @@ export default defineBackground(() => {
       void preloadTtsModel();
     }
   });
-});
+}
 
 async function readCurrentPageAndSendToMac(summarize: boolean): Promise<ReadResult> {
   try {
@@ -299,6 +322,10 @@ async function sendToOffscreen(action: TtsAction, data?: unknown) {
 }
 
 async function sendTtsMessage(action: TtsAction, data?: unknown) {
+  if (isFirefoxRuntime()) {
+    return sendFirefoxTtsMessage(action, data as FirefoxTtsHostRequest['data']);
+  }
+
   if (canUseChromeOffscreen()) {
     return sendToOffscreen(action, data);
   }
@@ -331,6 +358,102 @@ async function getBackgroundTtsEngine() {
   }
 
   return backgroundTtsEngine;
+}
+
+async function sendFirefoxTtsMessage(action: TtsAction, data?: FirefoxTtsHostRequest['data']) {
+  await ensureFirefoxTtsHost();
+  if (!firefoxTtsHostPort) {
+    throw new Error('Firefox TTS host is not available.');
+  }
+
+  const id = nextFirefoxTtsRequestId++;
+  return new Promise<unknown>((resolve, reject) => {
+    pendingFirefoxTtsRequests.set(id, { resolve, reject });
+    firefoxTtsHostPort?.postMessage({ id, action, data } satisfies FirefoxTtsHostRequest);
+  });
+}
+
+async function ensureFirefoxTtsHost() {
+  if (firefoxTtsHostPort) {
+    return;
+  }
+
+  if (!firefoxTtsHostReadyPromise) {
+    firefoxTtsHostReadyPromise = (async () => {
+      const existingTabs = await browser.tabs.query({
+        url: browser.runtime.getURL(FIREFOX_TTS_HOST_PAGE as never),
+      });
+
+      const existingTab = existingTabs.find((tab) => typeof tab.id === 'number');
+      if (existingTab?.id !== undefined) {
+        firefoxTtsHostTabId = existingTab.id;
+        await connectFirefoxTtsHost(existingTab.id);
+        return;
+      }
+
+      const tab = await browser.tabs.create({
+        url: browser.runtime.getURL(FIREFOX_TTS_HOST_PAGE as never),
+        active: false,
+      });
+
+      if (typeof tab.id === 'number') {
+        firefoxTtsHostTabId = tab.id;
+      }
+
+      await new Promise<void>((resolve) => {
+        resolveFirefoxTtsHostReady = resolve;
+      });
+    })().finally(() => {
+      firefoxTtsHostReadyPromise = null;
+      resolveFirefoxTtsHostReady = null;
+    });
+  }
+
+  await firefoxTtsHostReadyPromise;
+}
+
+async function connectFirefoxTtsHost(tabId: number) {
+  if (firefoxTtsHostPort) {
+    return;
+  }
+
+  try {
+    firefoxTtsHostPort = browser.tabs.connect(tabId, {
+      name: FIREFOX_TTS_HOST_PORT_NAME,
+    });
+  } catch (error) {
+    console.error('[Anything Reader][Background] Failed to connect to Firefox TTS host', error);
+    throw error;
+  }
+
+  firefoxTtsHostPort.onMessage.addListener((message: FirefoxTtsHostResponse) => {
+    const pending = pendingFirefoxTtsRequests.get(message.id);
+    if (!pending) {
+      return;
+    }
+
+    pendingFirefoxTtsRequests.delete(message.id);
+    if (message.success) {
+      pending.resolve(message.result);
+    } else {
+      pending.reject(new Error(message.error));
+    }
+  });
+
+  firefoxTtsHostPort.onDisconnect.addListener(() => {
+    firefoxTtsHostPort = null;
+    firefoxTtsHostTabId = null;
+    for (const pending of pendingFirefoxTtsRequests.values()) {
+      pending.reject(new Error('Firefox TTS host disconnected.'));
+    }
+    pendingFirefoxTtsRequests.clear();
+  });
+
+  resolveFirefoxTtsHostReady?.();
+}
+
+function isFirefoxTtsHostReadyMessage(message: unknown) {
+  return message && typeof message === 'object' && (message as { type?: unknown }).type === FIREFOX_TTS_HOST_READY_MESSAGE;
 }
 
 async function preloadTtsModel() {
@@ -489,3 +612,10 @@ function getChromeApi() {
     contextMenus: browserAsChrome.contextMenus as unknown as ChromeContextMenusApi,
   };
 }
+
+const background = defineBackground({
+  include: ['chrome'],
+  main: backgroundMain,
+});
+
+export default background;

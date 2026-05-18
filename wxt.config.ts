@@ -38,7 +38,7 @@ export default defineConfig({
         resources:
           browser === 'firefox'
             ? ['icon*.png', 'speaker.svg', 'kittenTTS/*', 'supertonic/ort/*', 'reader.html', 'reader.js', 'reader-init.js']
-            : ['icon*.png', 'speaker.svg', 'kittenTTS/*', 'supertonic/onnx/*', 'supertonic/ort/*', 'reader.html', 'reader.js', 'reader-init.js', 'supertonic/voice_styles/*'],
+            : ['icon*.png', 'speaker.svg', 'supertonic/onnx/*', 'supertonic/ort/*', 'reader.html', 'reader.js', 'reader-init.js', 'supertonic/voice_styles/*'],
         matches: ['<all_urls>'],
       },
     ],
@@ -58,4 +58,14 @@ export default defineConfig({
       },
     },
   }),
+  hooks: {
+    'build:manifestGenerated'(wxt, manifest) {
+      if (wxt.config.browser === 'firefox') {
+        (manifest as typeof manifest & { background?: { page: string; persistent?: boolean } }).background = {
+          page: 'tts-host.html',
+          persistent: true,
+        };
+      }
+    },
+  },
 });

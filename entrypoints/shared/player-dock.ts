@@ -246,7 +246,8 @@ export function createPlayerDock(manager: PlayerDockManager) {
     manager.updateStatus('Anything Reader', '#4CAF50');
   });
 
-  playButton.addEventListener('click', (event) => {
+  playButton.addEventListener('click', async (event) => {
+    await manager.unlockAudioPlayback?.();
     manager.handleBottomFloatingButtonClick(event as unknown as MouseEvent);
   });
 

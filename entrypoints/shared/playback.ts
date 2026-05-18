@@ -192,6 +192,10 @@ export function addToAudioCache(manager, cacheKey, audioUrl) {
 }
 
 export function prefetchNextTakes(manager, startIndex, count = 4) {
+  if (manager.isFirefoxOnlyKitten) {
+    return;
+  }
+
   if (!manager.currentPlayList || manager.shouldStopSequentialPlayback || !manager.isPluginEnabled) {
     return;
   }
@@ -210,6 +214,10 @@ export function prefetchNextTakes(manager, startIndex, count = 4) {
 }
 
 export async function prepareNextTake(manager, playListIndex) {
+  if (manager.isFirefoxOnlyKitten) {
+    return null;
+  }
+
   const take = manager.currentPlayList?.[playListIndex];
   if (!take || manager.shouldStopSequentialPlayback || !manager.isPluginEnabled) {
     return null;

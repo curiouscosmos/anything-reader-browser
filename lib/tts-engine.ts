@@ -275,10 +275,17 @@ export function createSupertonicTtsEngine(options: TtsEngineOptions) {
       throw new Error('KittenTTS was not ready.');
     }
 
-    const voiceId = normalizeKittenVoiceId(data.voiceId);
-    const voice = kittenEngine.voices.get(voiceId);
+    const voiceId = resolveKittenVoiceId(data.voiceId, kittenEngine.voices);
+    const voice = kittenEngine.voices.get(voiceId) ?? kittenEngine.voices.values().next().value;
     if (!voice) {
-      throw new Error(`KittenTTS voice is missing: ${voiceId}`);
+      throw new Error('KittenTTS voices were not loaded.');
+    }
+    if (!kittenEngine.voices.has(voiceId)) {
+      console.warn(options.debugPrefix, 'KittenTTS voice fallback in use', {
+        requestedVoiceId: data.voiceId,
+        resolvedVoiceId: voiceId,
+        loadedVoices: [...kittenEngine.voices.keys()],
+      });
     }
 
     const speedBase = data.speechLength && data.speechLength > 0 ? 1 / data.speechLength : 1.25;
@@ -545,6 +552,16 @@ function normalizeVoiceId(voiceId: unknown) {
 
 function normalizeKittenVoiceId(voiceId: unknown) {
   return typeof voiceId === 'string' && /^expr-voice-[2-5]-[mf]$/.test(voiceId) ? voiceId : DEFAULT_KITTEN_VOICE_ID;
+}
+
+function resolveKittenVoiceId(voiceId: unknown, voices: Map<string, Float32Array>) {
+  const normalizedVoiceId = normalizeKittenVoiceId(voiceId);
+  if (voices.has(normalizedVoiceId)) {
+    return normalizedVoiceId;
+  }
+
+  const firstAvailableVoiceId = voices.keys().next().value;
+  return typeof firstAvailableVoiceId === 'string' ? firstAvailableVoiceId : normalizedVoiceId;
 }
 
 function normalizeLanguage(language: unknown) {

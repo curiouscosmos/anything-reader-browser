@@ -39,6 +39,10 @@ for (const sourceDir of sourceDirs) {
       continue;
     }
 
+    if (!isFirefoxBuild && sourceDir.endsWith(`${path.sep}assets`) && file === 'kittenTTS') {
+      continue;
+    }
+
     const source = path.join(sourceDir, file);
 
     if (!file.endsWith('.ts')) {

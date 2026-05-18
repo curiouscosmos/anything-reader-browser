@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { isFirefoxRuntime } from '@/lib/browser-flavor.ts';
+import { sendFirefoxTtsMessage } from '@/lib/firefox-tts-client.ts';
+import type { KittenTtsAction } from '@/lib/kitten-tts-engine.ts';
 import { EXTRACT_READABLE_TEXT_MESSAGE } from '@/lib/native-messaging.ts';
 import { extractReadableTextFromDocument } from '@/lib/readable-text.ts';
 import {
@@ -72,8 +74,8 @@ class TTSManager {
       { name: 'Kiki', id: 'expr-voice-5-f', key: '7', description: 'is a lively female KittenTTS voice.' },
       { name: 'Leo', id: 'expr-voice-5-m', key: '8', description: 'is a lively male KittenTTS voice.' },
     ];
-    this.ttsModel = 'kitten';
-    this.VOICES = this.KITTEN_VOICES;
+    this.ttsModel = this.isFirefoxOnlyKitten ? 'kitten' : 'supertonic';
+    this.VOICES = this.isFirefoxOnlyKitten ? this.KITTEN_VOICES : this.SUPERTONIC_VOICES;
 
     this.preTakes = [];
     this.currentAudio = null;
@@ -99,7 +101,7 @@ class TTSManager {
     this.lastPageReadError = null;
 
 
-    this.selectedVoice = this.VOICES[2];
+    this.selectedVoice = this.isFirefoxOnlyKitten ? this.KITTEN_VOICES[2] : this.SUPERTONIC_VOICES[0];
     this.playbackSpeed = 1.0;
     this.quality = 'Balanced';
 
@@ -180,8 +182,10 @@ class TTSManager {
     ];
     this.useWebAudio = this.isCSPRestrictedSite();
     this.audioContext = null;
+    this.audioPlaybackUnlocked = false;
     this.currentAudioSource = null;
     this.currentAudioBuffer = null;
+    this.setupFirefoxAudioUnlockListeners();
 
     // Warm the offscreen Supertonic runtime as soon as the content script loads.
     this.warmupTTSModel();
@@ -207,6 +211,52 @@ class TTSManager {
   isCSPRestrictedSite() {
     const hostname = window.location.hostname.toLowerCase();
     return this.cspRestrictedSites.some(site => hostname.includes(site));
+  }
+
+  shouldUseWebAudioPlayback() {
+    return this.useWebAudio || this.isFirefoxOnlyKitten || this.ttsModel === 'kitten';
+  }
+
+  setupFirefoxAudioUnlockListeners() {
+    if (!this.isFirefoxOnlyKitten) {
+      return;
+    }
+
+    const unlock = () => {
+      void this.unlockAudioPlayback();
+    };
+
+    document.addEventListener('pointerdown', unlock, true);
+    document.addEventListener('keydown', unlock, true);
+    document.addEventListener('touchstart', unlock, true);
+  }
+
+  async unlockAudioPlayback() {
+    if (!this.isFirefoxOnlyKitten || this.audioPlaybackUnlocked) {
+      return;
+    }
+
+    try {
+      console.info('[Anything Reader][FirefoxPlayback] unlock requested');
+      if (!this.audioContext) {
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      console.info('[Anything Reader][FirefoxPlayback] unlock context state', this.audioContext.state);
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+
+      const buffer = this.audioContext.createBuffer(1, 1, this.audioContext.sampleRate);
+      const source = this.audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(this.audioContext.destination);
+      source.start(0);
+      this.audioPlaybackUnlocked = true;
+      console.info('[Anything Reader][FirefoxPlayback] unlock complete');
+    } catch (error) {
+      this.warn('Firefox audio unlock failed:', error);
+    }
   }
 
   createWebAudioPlayer(audioBuffer) {
@@ -259,8 +309,18 @@ class TTSManager {
       set onended(callback) { this._onended = callback; },
       set onerror(callback) { this._onerror = callback; },
 
-      play() {
+      async play() {
         if (this._isPlaying && !this._isPaused) return Promise.resolve();
+
+        console.info('[Anything Reader][FirefoxPlayback] webaudio play requested', {
+          paused: this._isPaused,
+          state: this._audioContext.state,
+          duration: this._duration,
+        });
+
+        if (this._audioContext.state === 'suspended') {
+          await this._audioContext.resume();
+        }
 
         if (this._isPaused) {
           this._source = this._audioContext.createBufferSource();
@@ -302,6 +362,7 @@ class TTSManager {
             return;
           }
 
+          console.info('[Anything Reader][FirefoxPlayback] webaudio source ended');
           this._isPlaying = false;
           this._isPaused = false;
           this._currentTime = this._duration;
@@ -320,6 +381,7 @@ class TTSManager {
       pause() {
         if (!this._isPlaying || this._isPaused) return;
 
+        console.info('[Anything Reader][FirefoxPlayback] webaudio pause requested');
         if (this._source) {
           this._source.onended = null;
           this._source.stop();
@@ -405,6 +467,14 @@ class TTSManager {
           reject(new Error('Extension context invalidated'));
           return;
         }
+
+        if (this.isFirefoxOnlyKitten) {
+          sendFirefoxTtsMessage(action, data)
+            .then(resolve)
+            .catch(reject);
+          return;
+        }
+
         chrome.runtime.sendMessage({ action, data }, (response) => {
           if (chrome.runtime.lastError) {
             reject(new Error(chrome.runtime.lastError.message));
@@ -758,7 +828,7 @@ class TTSManager {
       padding: 6px 0 !important;
     `;
     const rateText = document.createElement('span');
-    rateText.innerHTML = 'Enjoying Anything Reader? <a href="https://chromewebstore.google.com/detail/mdbiaajonlkomihpcaffhkagodbcgbme?utm_source=item-share-cb" target="_blank" style="color: #227cff; text-decoration: none; cursor: pointer;">Rate us.</a>';
+    rateText.innerHTML = 'Enjoying Anything Reader? <a href="https://chromewebstore.google.com/detail/liphomfpcfajhbajfnajmknjeckejfbb?utm_source=item-share-cb" target="_blank" style="color: #227cff; text-decoration: none; cursor: pointer;">Please rate us.</a>';
     rateText.style.cssText = `
       color: ${this.currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : '#1d1d1d'} !important;
       font-size: 14px !important;
@@ -1143,7 +1213,9 @@ class TTSManager {
       }
 
       if (!this.ttsInitialized) {
-        this.initializeSupertonic();
+        void this.initializeSupertonic().catch((error) => {
+          this.warn('Background Supertonic initialization failed during enable toggle:', error);
+        });
       }
     } else {
       this.applyPluginDisabledEffects();
@@ -1897,25 +1969,33 @@ class TTSManager {
 
         chrome.storage.sync.get(['ar-tts-model'], (result) => {
           if (result['ar-tts-model']) {
-            resolve(this.normalizeTtsModel(result['ar-tts-model']));
+            const normalized = this.normalizeTtsModel(result['ar-tts-model']);
+            if (normalized !== result['ar-tts-model']) {
+              chrome.storage.sync.set({ 'ar-tts-model': normalized }).catch(() => {});
+              localStorage.setItem('ar-tts-model', JSON.stringify(normalized));
+            }
+            resolve(normalized);
             return;
           }
 
           try {
             const saved = localStorage.getItem('ar-tts-model');
             if (saved) {
-              resolve(this.normalizeTtsModel(JSON.parse(saved)));
+              const normalized = this.normalizeTtsModel(JSON.parse(saved));
+              chrome.storage.sync.set({ 'ar-tts-model': normalized }).catch(() => {});
+              localStorage.setItem('ar-tts-model', JSON.stringify(normalized));
+              resolve(normalized);
               return;
             }
           } catch (error) {
             this.warn('Failed to load TTS model from localStorage:', error);
           }
 
-          resolve('kitten');
+          resolve('supertonic');
         });
       } catch (error) {
         this.warn('Failed to load TTS model setting:', error);
-        resolve('kitten');
+        resolve('supertonic');
       }
     });
   }
@@ -1925,7 +2005,7 @@ class TTSManager {
       return 'kitten';
     }
 
-    return model === 'supertonic' ? 'supertonic' : 'kitten';
+    return 'supertonic';
   }
 
   applyVoiceCatalogForModel() {
@@ -1933,7 +2013,7 @@ class TTSManager {
   }
 
   getDefaultVoiceForModel() {
-    return this.isFirefoxOnlyKitten || this.ttsModel !== 'supertonic' ? this.KITTEN_VOICES[2] : this.SUPERTONIC_VOICES[2];
+    return this.isFirefoxOnlyKitten || this.ttsModel !== 'supertonic' ? this.KITTEN_VOICES[2] : this.SUPERTONIC_VOICES[0];
   }
 
   async saveSpeedSetting(speed) {
@@ -2144,7 +2224,9 @@ class TTSManager {
       this.showUI();
 
       if (!this.ttsInitialized) {
-        this.initializeSupertonic();
+        void this.initializeSupertonic().catch((error) => {
+          this.warn('Background Supertonic initialization failed during settings sync:', error);
+        });
       }
 
       this.updateConsoleLogStatus();
@@ -2818,6 +2900,7 @@ class TTSManager {
 
     this.takeHoverIcon.addEventListener('click', async (event) => {
       event.stopPropagation();
+      await this.unlockAudioPlayback();
       await this.startPlaybackFromTake(take);
     });
 
@@ -3374,6 +3457,12 @@ class TTSManager {
       return;
     }
 
+    console.info('[Anything Reader][FirefoxPlayback] startPlaybackFromTake', {
+      takeId: startTake?.id,
+      textLength: startTake?.text?.length,
+      takes: this.preTakes?.length,
+    });
+
     const wasGenerating = this.isGenerating;
     const previousGeneratingTakeId = this.currentGeneratingTakeId;
 
@@ -3407,7 +3496,9 @@ class TTSManager {
     this.currentPlayList = this.preTakes.slice(startIndex);
     this.currentTakeIndex = 0;
     this.currentPlayingTakeId = startTake.id;
-    this.prefetchNextTakes(0, 4);
+    if (!this.isFirefoxOnlyKitten) {
+      this.prefetchNextTakes(0, this.ttsModel === 'kitten' ? 8 : 4);
+    }
 
 
     this.updateStatus(`Preparing playback... (${startIndex + 1}/${this.preTakes.length})`, '#FF9800');
@@ -3466,6 +3557,12 @@ class TTSManager {
       return;
     }
 
+    console.info('[Anything Reader][FirefoxPlayback] playTakeAtIndex', {
+      playListIndex,
+      takeId: take.id,
+      textLength: take.text?.length,
+    });
+
     this.currentTakeIndex = playListIndex;
     this.currentPlayingTakeId = take.id;
 
@@ -3479,7 +3576,9 @@ class TTSManager {
 
     this.updatePlaybackUI(take);
     this.updateStatus(`Playing... (${playListIndex + 1}/${this.currentPlayList.length})`, '#4CAF50');
-    this.prefetchNextTakes(playListIndex + 1, 4);
+    if (!this.isFirefoxOnlyKitten) {
+      this.prefetchNextTakes(playListIndex + 1, this.ttsModel === 'kitten' ? 8 : 4);
+    }
 
 
     try {
@@ -3493,6 +3592,11 @@ class TTSManager {
       } else if (this.audioPrefetchPromises && this.audioPrefetchPromises.has(cacheKey)) {
         audioUrl = await this.audioPrefetchPromises.get(cacheKey);
       } else {
+        console.info('[Anything Reader][FirefoxPlayback] playTakeAtIndex generateTTSAudio request', {
+          playListIndex,
+          takeId: take.id,
+          textLength: take.text?.length,
+        });
         audioUrl = await this.generateTTSAudio(take, {
           showAnimation: true,
           updateStatus: true,
@@ -3500,13 +3604,22 @@ class TTSManager {
           playAfterGenerate: false,
           context: 'selection'
         });
+        console.info('[Anything Reader][FirefoxPlayback] playTakeAtIndex generateTTSAudio result', {
+          playListIndex,
+          takeId: take.id,
+          hasAudioUrl: Boolean(audioUrl),
+          type: typeof audioUrl,
+          hasAudioBuffer: Boolean(audioUrl && typeof audioUrl === 'object' && audioUrl.audioBuffer),
+        });
         if (audioUrl) {
           this.addToAudioCache(cacheKey, audioUrl);
         }
       }
 
       if (audioUrl) {
-        this.prefetchNextTakes(playListIndex + 1, 4);
+        if (!this.isFirefoxOnlyKitten) {
+          this.prefetchNextTakes(playListIndex + 1, 4);
+        }
         await this.playAudioWithTracking(audioUrl, take);
       } else {
         this.error(`❌ Take playback failed: ${take.id}`);
@@ -3591,12 +3704,24 @@ class TTSManager {
 
   async playAudioWithTracking(audioUrl, take) {
     return new Promise((resolve, reject) => {
-      const hostname = window.location.hostname.toLowerCase();
-      const isCSPRestricted = this.cspRestrictedSites.some(site => hostname.includes(site));
+      const shouldUseWebAudio = this.shouldUseWebAudioPlayback();
+      console.info('[Anything Reader][FirefoxPlayback] playAudioWithTracking branch', {
+        shouldUseWebAudio,
+        type: typeof audioUrl,
+        hasAudioBuffer: Boolean(audioUrl && typeof audioUrl === 'object' && audioUrl.audioBuffer),
+      });
 
-      if (isCSPRestricted && audioUrl && typeof audioUrl === 'object' && audioUrl.audioBuffer) {
+      if (shouldUseWebAudio && audioUrl && typeof audioUrl === 'object' && audioUrl.audioBuffer) {
+        console.info('[Anything Reader][FirefoxPlayback] playAudioWithTracking webaudio', {
+          sampleRate: audioUrl.sampleRate,
+          duration: audioUrl.audioBuffer.duration,
+        });
         this.currentAudio = this.createWebAudioPlayer(audioUrl.audioBuffer, audioUrl.sampleRate);
                   } else {
+      console.info('[Anything Reader][FirefoxPlayback] playAudioWithTracking htmlaudio', {
+        type: typeof audioUrl,
+        isBlobUrl: typeof audioUrl === 'string' && audioUrl.startsWith('blob:'),
+      });
       this.currentAudio = new Audio(audioUrl);
       }
 
@@ -3666,7 +3791,7 @@ class TTSManager {
             this.updateStatus('Playback complete', '#4CAF50');
           }
           resolve();
-        }, 500);
+        }, this.ttsModel === 'kitten' ? 50 : 500);
       };
 
       this.currentAudio.onerror = (error) => {
@@ -6349,9 +6474,25 @@ class TTSManager {
   async generateSingleChunkAudio(text, voice, language, chunkIndexOrAbortController = 0) {
     const chunkIndex = typeof chunkIndexOrAbortController === 'number' ? chunkIndexOrAbortController : 0;
     const abortController = chunkIndexOrAbortController instanceof AbortController ? chunkIndexOrAbortController : this.abortController;
+    console.info('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio entry', {
+      chunkIndex,
+      textLength: text?.length,
+      voiceId: voice?.id,
+      language,
+      shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
+      aborted: Boolean(abortController && abortController.signal?.aborted),
+    });
 
     if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
-      return null;
+      console.warn('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
+        chunkIndex,
+        reason: 'preflight_abort',
+        shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
+        aborted: Boolean(abortController && abortController.signal?.aborted),
+      });
+      if (!this.isFirefoxOnlyKitten) {
+        return null;
+      }
     }
 
     let processedText = text;
@@ -6361,7 +6502,15 @@ class TTSManager {
 
     try {
       if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
-        return null;
+        console.warn('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
+          chunkIndex,
+          reason: 'aborted_before_tts',
+          shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
+          aborted: Boolean(abortController && abortController.signal?.aborted),
+        });
+        if (!this.isFirefoxOnlyKitten) {
+          return null;
+        }
       }
 
       if (!this.ttsInitialized) {
@@ -6369,25 +6518,71 @@ class TTSManager {
       }
 
       if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
-        return null;
+        console.warn('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
+          chunkIndex,
+          reason: 'aborted_before_decode',
+          shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
+          aborted: Boolean(abortController && abortController.signal?.aborted),
+        });
+        if (!this.isFirefoxOnlyKitten) {
+          return null;
+        }
       }
 
       const speechLength = 1.0 / (this.playbackSpeed + 0.05);
       const qualityStepMap = { 'Fast': 5, 'Balanced': 8, 'Quality': 15 };
       const totalStep = qualityStepMap[this.quality] || 8;
       const pageLang = this.detectPageLanguageForOffscreen();
-
-      const result = await this.sendTTSMessage('tts-generate', {
+      console.info('[Anything Reader][FirefoxPlayback] generateTTSAudio start', {
+        chunkIndex,
+        textLength: processedText?.length,
         model: this.ttsModel,
-        text: processedText,
+        voiceId: this.selectedVoice?.id,
+      });
+      console.info('[Anything Reader][FirefoxPlayback] generateTTSAudio send preflight', {
+        chunkIndex,
+        model: this.ttsModel,
         voiceId: voice.id,
-        speechLength,
-        totalStep,
-        language: pageLang
+        language: pageLang,
+        sendType: typeof this.sendTTSMessage,
+        firefoxOnlyKitten: this.isFirefoxOnlyKitten,
       });
 
+      let result;
+      try {
+        result = await this.sendTTSMessage('tts-generate', {
+          model: this.ttsModel,
+          text: processedText,
+          voiceId: voice.id,
+          speechLength,
+          totalStep,
+          language: pageLang
+        });
+        console.info('[Anything Reader][FirefoxPlayback] tts result received', {
+          chunkIndex,
+          success: result?.success,
+          sampleRate: result?.sampleRate,
+          audioBase64Length: typeof result?.audioBase64 === 'string' ? result.audioBase64.length : undefined,
+        });
+      } catch (error) {
+        console.error('[Anything Reader][FirefoxPlayback] generateTTSAudio send failed', {
+          chunkIndex,
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+        throw error;
+      }
+
       if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
-        return null;
+        console.warn('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
+          chunkIndex,
+          reason: 'aborted_before_return',
+          shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
+          aborted: Boolean(abortController && abortController.signal?.aborted),
+        });
+        if (!this.isFirefoxOnlyKitten) {
+          return null;
+        }
       }
 
       if (!result.success) {
@@ -6395,7 +6590,15 @@ class TTSManager {
       }
 
       if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
-        return null;
+        console.warn('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
+          chunkIndex,
+          reason: 'abort_in_catch',
+          shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
+          aborted: Boolean(abortController && abortController.signal?.aborted),
+        });
+        if (!this.isFirefoxOnlyKitten) {
+          return null;
+        }
       }
 
       const binaryString = atob(result.audioBase64);
@@ -6411,13 +6614,31 @@ class TTSManager {
       const wavBlob = new Blob([wavBytes], { type: 'audio/wav' });
       const sampleRate = result.sampleRate;
 
-      const hostname = window.location.hostname.toLowerCase();
-      const isCSPRestricted = this.cspRestrictedSites.some(site => hostname.includes(site));
+      const shouldUseWebAudio = this.shouldUseWebAudioPlayback();
+      console.info('[Anything Reader][FirefoxPlayback] generation playback branch', {
+        shouldUseWebAudio,
+        sampleRate,
+        audioBuffer: shouldUseWebAudio,
+      });
 
-      if (isCSPRestricted) {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (shouldUseWebAudio) {
+        const audioContext = this.audioContext || new (window.AudioContext || window.webkitAudioContext)();
+        this.audioContext = audioContext;
+        console.info('[Anything Reader][FirefoxPlayback] decode audio', {
+          state: audioContext.state,
+          sampleRate,
+          byteLength: wavBytes.byteLength,
+        });
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
         const arrayBuffer = wavBytes.buffer.slice(0, wavBytes.byteLength);
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        console.info('[Anything Reader][FirefoxPlayback] decoded audio buffer', {
+          duration: audioBuffer.duration,
+          sampleRate: audioBuffer.sampleRate,
+          length: audioBuffer.length,
+        });
         if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
           return null;
         }
@@ -6430,6 +6651,11 @@ class TTSManager {
 
       return URL.createObjectURL(wavBlob);
     } catch (error) {
+      console.error('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio caught', {
+        chunkIndex,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
         return null;
       }
@@ -6441,12 +6667,11 @@ class TTSManager {
   async mergeAudioUrls(audioUrls) {
 
     try {
-      const hostname = window.location.hostname.toLowerCase();
-      const isCSPRestricted = this.cspRestrictedSites.some(site => hostname.includes(site));
+      const shouldUseWebAudio = this.shouldUseWebAudioPlayback();
 
       const audioBuffers = await Promise.all(
         audioUrls.map(async (urlOrBuffer, index) => {
-          if (isCSPRestricted && urlOrBuffer && typeof urlOrBuffer === 'object' && urlOrBuffer.audioBuffer) {
+          if (shouldUseWebAudio && urlOrBuffer && typeof urlOrBuffer === 'object' && urlOrBuffer.audioBuffer) {
             return urlOrBuffer.audioBuffer;
           }
 
@@ -6473,7 +6698,7 @@ class TTSManager {
         offset += buffer.length;
       }
 
-      if (isCSPRestricted) {
+      if (shouldUseWebAudio) {
         return { audioBuffer: mergedBuffer, sampleRate };
       }
 
@@ -6582,8 +6807,20 @@ class TTSManager {
 
   async generateTTSAudio(take, options = {}) {
     if (!this.isPluginEnabled) {
+      console.warn('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
+        takeId: take?.id,
+        reason: 'plugin_disabled',
+      });
       return null;
     }
+
+    console.info('[Anything Reader][FirefoxPlayback] generateTTSAudio entry', {
+      takeId: take?.id,
+      textLength: take?.text?.length,
+      isGenerating: this.isGenerating,
+      shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
+      isFirefoxOnlyKitten: this.isFirefoxOnlyKitten,
+    });
 
     const {
       showAnimation = true,
@@ -6594,20 +6831,35 @@ class TTSManager {
     } = options;
 
     if (this.isGenerating) {
-      return null;
-    }
-
-    if (this.isGenerating) {
-      this.isGenerating = false;
-      this.currentGeneratingTakeId = null;
+      if (this.isFirefoxOnlyKitten) {
+        console.warn('[Anything Reader][FirefoxPlayback] clearing stale generating flag before playback');
+        this.isGenerating = false;
+        this.currentGeneratingTakeId = null;
+      } else {
+        console.warn('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
+          takeId: take?.id,
+          reason: 'already_generating',
+        });
+        return null;
+      }
     }
 
     if (this.shouldStopSequentialPlayback) {
-      return null;
+      console.warn('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
+        takeId: take?.id,
+        reason: 'should_stop_sequential_playback',
+      });
+      if (!this.isFirefoxOnlyKitten) {
+        return null;
+      }
     }
 
     if (!take || !take.id) {
       this.error(`❌ Invalid take:`, take);
+      console.warn('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
+        takeId: take?.id,
+        reason: 'invalid_take',
+      });
       return null;
     }
 
@@ -6687,7 +6939,13 @@ class TTSManager {
     let audioUrl = null;
     try {
       if (this.shouldStopSequentialPlayback) {
-        return null;
+        console.warn('[Anything Reader][FirefoxPlayback] generateTTSAudio continue despite stop flag', {
+          takeId: take?.id,
+          shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
+        });
+        if (!this.isFirefoxOnlyKitten) {
+          return null;
+        }
       }
 
       const isMultiChunk = this.needsMultiChunk(apiText, take.language);
@@ -6701,6 +6959,12 @@ class TTSManager {
       }
 
       if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
+        console.warn('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
+          takeId: take?.id,
+          reason: 'aborted_after_generation',
+          shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
+          aborted: Boolean(abortController && abortController.signal?.aborted),
+        });
         return null;
       }
 
@@ -6724,6 +6988,12 @@ class TTSManager {
       this.currentGeneratingTakeId = null;
     }
 
+    console.info('[Anything Reader][FirefoxPlayback] generateTTSAudio return', {
+      takeId: take.id,
+      hasAudioUrl: Boolean(audioUrl),
+      type: typeof audioUrl,
+      hasAudioBuffer: Boolean(audioUrl && typeof audioUrl === 'object' && audioUrl.audioBuffer),
+    });
     return audioUrl;
   }
 
@@ -6774,6 +7044,11 @@ class TTSManager {
   }
 
   async convertToSpeech(take) {
+    console.info('[Anything Reader][FirefoxPlayback] convertToSpeech', {
+      takeId: take?.id,
+      textLength: take?.text?.length,
+      voiceId: this.selectedVoice?.id,
+    });
 
     if (this.isGenerating) {
     }
@@ -6802,12 +7077,24 @@ class TTSManager {
 
   async playAudio(audioUrl, takeIndex) {
     return new Promise((resolve, reject) => {
-      const hostname = window.location.hostname.toLowerCase();
-      const isCSPRestricted = this.cspRestrictedSites.some(site => hostname.includes(site));
+      const shouldUseWebAudio = this.shouldUseWebAudioPlayback();
+      console.info('[Anything Reader][FirefoxPlayback] playAudio branch', {
+        shouldUseWebAudio,
+        type: typeof audioUrl,
+        hasAudioBuffer: Boolean(audioUrl && typeof audioUrl === 'object' && audioUrl.audioBuffer),
+      });
 
-      if (isCSPRestricted && audioUrl && typeof audioUrl === 'object' && audioUrl.audioBuffer) {
+      if (shouldUseWebAudio && audioUrl && typeof audioUrl === 'object' && audioUrl.audioBuffer) {
+        console.info('[Anything Reader][FirefoxPlayback] playAudio webaudio', {
+          sampleRate: audioUrl.sampleRate,
+          duration: audioUrl.audioBuffer.duration,
+        });
         this.currentAudio = this.createWebAudioPlayer(audioUrl.audioBuffer, audioUrl.sampleRate);
                 } else {
+      console.info('[Anything Reader][FirefoxPlayback] playAudio htmlaudio', {
+        type: typeof audioUrl,
+        isBlobUrl: typeof audioUrl === 'string' && audioUrl.startsWith('blob:'),
+      });
       this.currentAudio = new Audio(audioUrl);
       }
 
@@ -6845,7 +7132,9 @@ class TTSManager {
 
             const nextCacheKey = `take_${this.currentTakeIndex}_${this.ttsModel}_${this.selectedVoice.id}`;
             const nextTakeBuffered = this.getFromAudioCache(nextCacheKey);
-            const delay = nextTakeBuffered ? 50 : 200;
+            const delay = this.ttsModel === 'kitten'
+              ? (nextTakeBuffered ? 0 : 25)
+              : (nextTakeBuffered ? 50 : 200);
 
             if (this.pendingNextTakeTimeout) {
               clearTimeout(this.pendingNextTakeTimeout);
@@ -6871,7 +7160,7 @@ class TTSManager {
           }
 
           resolve();
-        }, 500);
+        }, this.ttsModel === 'kitten' ? 50 : 500);
       };
 
       this.currentAudio.onerror = (error) => {
@@ -6895,7 +7184,12 @@ class TTSManager {
         }
       };
 
-      this.currentAudio.play().catch(reject);
+      this.currentAudio.play().then(() => {
+        console.info('[Anything Reader][FirefoxPlayback] play() resolved');
+      }).catch((error) => {
+        console.error('[Anything Reader][FirefoxPlayback] play() rejected', error);
+        reject(error);
+      });
     });
   }
 
