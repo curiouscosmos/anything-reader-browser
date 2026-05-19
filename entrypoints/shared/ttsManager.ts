@@ -560,11 +560,11 @@ class TTSManager {
             this.warn('Failed to load background music enabled from localStorage:', error);
           }
 
-          resolve(false);
+          resolve(true);
         });
       } catch (error) {
         this.warn('Failed to load background music enabled setting:', error);
-        resolve(false);
+        resolve(true);
       }
     });
   }

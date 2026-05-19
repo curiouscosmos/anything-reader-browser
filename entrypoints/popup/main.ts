@@ -134,7 +134,7 @@ async function initializePopup() {
 
   const savedBackgroundMusicVolume = Number(settings[BACKGROUND_MUSIC_STORAGE_KEYS.volume]);
   setBackgroundMusicVolume(Number.isFinite(savedBackgroundMusicVolume) ? savedBackgroundMusicVolume : DEFAULT_BACKGROUND_MUSIC_VOLUME);
-  backgroundMusicEnabledToggle.checked = settings[BACKGROUND_MUSIC_STORAGE_KEYS.enabled] === true;
+  backgroundMusicEnabledToggle.checked = settings[BACKGROUND_MUSIC_STORAGE_KEYS.enabled] !== false;
   updateBackgroundMusicControlsVisibility(backgroundMusicEnabledToggle.checked);
 
   const savedHighlightColorIndex = Number(settings['ar-highlight-color']);

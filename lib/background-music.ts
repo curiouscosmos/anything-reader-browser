@@ -40,7 +40,9 @@ export const BUILTIN_BACKGROUND_MUSIC_TRACKS: BackgroundMusicTrack[] = BUILTIN_B
 });
 
 export function getDefaultBackgroundMusicTrackId() {
-  return BUILTIN_BACKGROUND_MUSIC_TRACKS[0]?.id ?? 'builtin:default';
+  return BUILTIN_BACKGROUND_MUSIC_TRACKS.find((track) => track.label === 'Wedding')?.id
+    ?? BUILTIN_BACKGROUND_MUSIC_TRACKS[0]?.id
+    ?? 'builtin:default';
 }
 
 export function normalizeBackgroundMusicTrackId(value: unknown) {
