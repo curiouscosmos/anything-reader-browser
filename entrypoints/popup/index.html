@@ -66,6 +66,30 @@
           </select>
         </label>
 
+        <label class="switch-row">
+          <span>
+            <strong>Add background music?</strong>
+            <small>Play low-volume music while reading</small>
+          </span>
+          <input id="background-music-enabled-toggle" type="checkbox" />
+        </label>
+
+        <div id="background-music-controls" class="background-music-controls">
+          <label class="field">
+            <span>Track</span>
+            <select id="background-music-track-select"></select>
+          </label>
+
+          <button type="button" id="background-music-upload-button">Upload audio</button>
+          <input id="background-music-file-input" type="file" accept="audio/*" hidden />
+
+          <label class="field">
+            <span>Volume</span>
+            <input id="background-music-volume" type="range" min="0" max="100" step="1" value="18" />
+            <small id="background-music-volume-label">18%</small>
+          </label>
+        </div>
+
         <div class="field">
           <span>Highlight Color</span>
           <div id="highlight-color-picker" class="color-picker" role="radiogroup" aria-label="Highlight Color"></div>

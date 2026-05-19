@@ -1,4 +1,12 @@
 import { READ_CURRENT_PAGE_MESSAGE, type ReadResult } from '@/lib/native-messaging.ts';
+import {
+  BACKGROUND_MUSIC_STORAGE_KEYS,
+  BUILTIN_BACKGROUND_MUSIC_TRACKS,
+  DEFAULT_BACKGROUND_MUSIC_VOLUME,
+  createUploadedBackgroundMusicTrack,
+  mergeBackgroundMusicTracks,
+  normalizeBackgroundMusicTrackId,
+} from '@/lib/background-music.ts';
 import config from '../../config/config.ts';
 import { isFirefoxRuntime } from '@/lib/browser-flavor.ts';
 import './style.css';
@@ -15,6 +23,9 @@ type ReaderSettingsResponse = {
   model?: TtsModel;
   voiceId?: string;
   speed?: number;
+  backgroundMusicEnabled?: boolean;
+  backgroundMusicTrackId?: string;
+  backgroundMusicVolume?: number;
   pluginEnabled?: boolean;
   floatingBarVisible?: boolean;
   autoScrollEnabled?: boolean;
@@ -66,6 +77,13 @@ const autoScrollToggle = getInput('auto-scroll-toggle');
 const highlightToggle = getInput('highlight-toggle');
 const voiceSelect = getSelect('voice-select');
 const speedSelect = getSelect('speed-select');
+const backgroundMusicEnabledToggle = getInput('background-music-enabled-toggle');
+const backgroundMusicTrackSelect = getSelect('background-music-track-select');
+const backgroundMusicUploadButton = getButton('background-music-upload-button');
+const backgroundMusicFileInput = getInput('background-music-file-input');
+const backgroundMusicVolumeInput = getInput('background-music-volume');
+const backgroundMusicVolumeLabel = getElement('background-music-volume-label');
+const backgroundMusicControls = getElement('background-music-controls');
 const highlightColorPicker = getElement('highlight-color-picker');
 const statusText = getElement('status-text');
 const readerControlsSection = getElement('model-section');
@@ -74,6 +92,7 @@ const readWithMacAppButton = getButton('read-with-mac-app');
 const summarizeWithMacAppButton = getButton('summarize-with-mac-app');
 
 let currentModel: TtsModel = DEFAULT_MODEL;
+let backgroundMusicTracks = [...BUILTIN_BACKGROUND_MUSIC_TRACKS];
 const firefoxOnlyKitten = isFirefoxRuntime();
 
 initializePopup().catch((error) => {
@@ -89,7 +108,10 @@ async function initializePopup() {
     'ar-highlight-color',
     'ar-voice',
     'ar-speed',
+    BACKGROUND_MUSIC_STORAGE_KEYS.enabled,
+    BACKGROUND_MUSIC_STORAGE_KEYS.volume,
   ]);
+  const localSettings = await browser.storage.local.get([BACKGROUND_MUSIC_STORAGE_KEYS.trackId]);
 
   enabledToggle.checked = settings['ar-plugin-enabled'] !== false;
   barToggle.checked = settings['ar-floating-bar-visible'] !== false;
@@ -106,6 +128,14 @@ async function initializePopup() {
 
   const savedSpeed = Number(settings['ar-speed']);
   speedSelect.value = getSpeedSelectValue(savedSpeed);
+
+  backgroundMusicTracks = await loadBackgroundMusicTracks();
+  renderBackgroundMusicTrackOptions(normalizeBackgroundMusicTrackId(localSettings[BACKGROUND_MUSIC_STORAGE_KEYS.trackId]));
+
+  const savedBackgroundMusicVolume = Number(settings[BACKGROUND_MUSIC_STORAGE_KEYS.volume]);
+  setBackgroundMusicVolume(Number.isFinite(savedBackgroundMusicVolume) ? savedBackgroundMusicVolume : DEFAULT_BACKGROUND_MUSIC_VOLUME);
+  backgroundMusicEnabledToggle.checked = settings[BACKGROUND_MUSIC_STORAGE_KEYS.enabled] === true;
+  updateBackgroundMusicControlsVisibility(backgroundMusicEnabledToggle.checked);
 
   const savedHighlightColorIndex = Number(settings['ar-highlight-color']);
   renderHighlightColorPicker(Number.isInteger(savedHighlightColorIndex) ? savedHighlightColorIndex : DEFAULT_HIGHLIGHT_COLOR_INDEX);
@@ -125,6 +155,21 @@ async function initializePopup() {
   highlightToggle.addEventListener('change', () => saveBooleanSetting('ar-highlight-enabled', highlightToggle.checked));
   voiceSelect.addEventListener('change', saveVoiceSetting);
   speedSelect.addEventListener('change', saveSpeedSetting);
+  backgroundMusicEnabledToggle.addEventListener('change', () => {
+    void saveBackgroundMusicEnabledSetting(backgroundMusicEnabledToggle.checked).catch((error) => {
+      setStatus(error instanceof Error ? error.message : String(error), true);
+    });
+    updateBackgroundMusicControlsVisibility(backgroundMusicEnabledToggle.checked);
+  });
+  backgroundMusicTrackSelect.addEventListener('change', () => void saveBackgroundMusicTrackSetting().catch((error) => {
+    setStatus(error instanceof Error ? error.message : String(error), true);
+  }));
+  backgroundMusicVolumeInput.addEventListener('input', () => {
+    updateBackgroundMusicVolumeLabel(Number(backgroundMusicVolumeInput.value));
+  });
+  backgroundMusicVolumeInput.addEventListener('change', saveBackgroundMusicVolumeSetting);
+  backgroundMusicUploadButton.addEventListener('click', () => backgroundMusicFileInput.click());
+  backgroundMusicFileInput.addEventListener('change', () => void handleBackgroundMusicUpload());
   readWithMacAppButton.addEventListener('click', () => void handleNativeActionClick(false));
   summarizeWithMacAppButton.addEventListener('click', () => void handleNativeActionClick(true));
 }
@@ -196,6 +241,16 @@ async function syncLiveReaderSettings() {
     if (typeof response.speed === 'number' && Number.isFinite(response.speed)) {
       speedSelect.value = getSpeedSelectValue(response.speed);
     }
+    if (typeof response.backgroundMusicEnabled === 'boolean') {
+      backgroundMusicEnabledToggle.checked = response.backgroundMusicEnabled;
+      updateBackgroundMusicControlsVisibility(response.backgroundMusicEnabled);
+    }
+    if (response.backgroundMusicTrackId) {
+      renderBackgroundMusicTrackOptions(normalizeBackgroundMusicTrackId(response.backgroundMusicTrackId));
+    }
+    if (typeof response.backgroundMusicVolume === 'number' && Number.isFinite(response.backgroundMusicVolume)) {
+      setBackgroundMusicVolume(response.backgroundMusicVolume);
+    }
   } catch {
     // Some pages cannot receive content-script messages; storage values remain the fallback.
   }
@@ -233,6 +288,58 @@ function selectHighlightColor(index: number) {
     button.classList.toggle('is-selected', isSelected);
     button.setAttribute('aria-checked', String(isSelected));
   });
+}
+
+function setBackgroundMusicVolume(volume: number) {
+  const safeVolume = Number.isFinite(volume) ? Math.max(0, Math.min(100, Math.round(volume))) : DEFAULT_BACKGROUND_MUSIC_VOLUME;
+  backgroundMusicVolumeInput.value = String(safeVolume);
+  updateBackgroundMusicVolumeLabel(safeVolume);
+}
+
+function updateBackgroundMusicVolumeLabel(volume: number) {
+  if (!backgroundMusicVolumeLabel) {
+    return;
+  }
+
+  const safeVolume = Math.max(0, Math.min(100, Math.round(volume)));
+  backgroundMusicVolumeLabel.textContent = `${safeVolume}%`;
+}
+
+function updateBackgroundMusicControlsVisibility(enabled: boolean) {
+  backgroundMusicControls.hidden = !enabled;
+}
+
+function renderBackgroundMusicTrackOptions(selectedTrackId: string) {
+  const selectedId = normalizeBackgroundMusicTrackId(selectedTrackId);
+  const builtinTracks = backgroundMusicTracks.filter((track) => track.kind === 'builtin');
+  const customTracks = backgroundMusicTracks.filter((track) => track.kind === 'custom');
+
+  backgroundMusicTrackSelect.replaceChildren();
+
+  const builtinGroup = document.createElement('optgroup');
+  builtinGroup.label = 'Built-in tracks';
+  builtinTracks.forEach((track) => {
+    const option = document.createElement('option');
+    option.value = track.id;
+    option.textContent = track.label;
+    builtinGroup.appendChild(option);
+  });
+  backgroundMusicTrackSelect.appendChild(builtinGroup);
+
+  if (customTracks.length > 0) {
+    const customGroup = document.createElement('optgroup');
+    customGroup.label = 'Uploaded tracks';
+    customTracks.forEach((track) => {
+      const option = document.createElement('option');
+      option.value = track.id;
+      option.textContent = track.label;
+      customGroup.appendChild(option);
+    });
+    backgroundMusicTrackSelect.appendChild(customGroup);
+  }
+
+  const hasMatch = backgroundMusicTracks.some((track) => track.id === selectedId);
+  backgroundMusicTrackSelect.value = hasMatch ? selectedId : backgroundMusicTracks[0]?.id ?? '';
 }
 
 function renderVoices(model: TtsModel) {
@@ -294,6 +401,83 @@ function getDefaultVoiceForModel(model: TtsModel) {
 async function saveSpeedSetting() {
   await browser.storage.sync.set({ 'ar-speed': Number(speedSelect.value) });
   setStatus(`Speed: ${speedSelect.value}x`);
+}
+
+async function saveBackgroundMusicEnabledSetting(enabled: boolean) {
+  await browser.storage.sync.set({ [BACKGROUND_MUSIC_STORAGE_KEYS.enabled]: enabled });
+  setStatus(enabled ? 'Background music on' : 'Background music off');
+}
+
+async function saveBackgroundMusicTrackSetting() {
+  const trackId = normalizeBackgroundMusicTrackId(backgroundMusicTrackSelect.value);
+  await browser.storage.local.set({ [BACKGROUND_MUSIC_STORAGE_KEYS.trackId]: trackId });
+  setStatus(`Background track: ${getBackgroundMusicTrackLabel(trackId)}`);
+}
+
+async function saveBackgroundMusicVolumeSetting() {
+  const volume = Number(backgroundMusicVolumeInput.value);
+  const safeVolume = Number.isFinite(volume) ? Math.max(0, Math.min(100, Math.round(volume))) : DEFAULT_BACKGROUND_MUSIC_VOLUME;
+  await browser.storage.sync.set({ [BACKGROUND_MUSIC_STORAGE_KEYS.volume]: safeVolume });
+  setBackgroundMusicVolume(safeVolume);
+  setStatus(`Background music: ${safeVolume}%`);
+}
+
+async function handleBackgroundMusicUpload() {
+  const file = backgroundMusicFileInput.files?.[0];
+  backgroundMusicFileInput.value = '';
+  if (!file) {
+    return;
+  }
+
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    const uploadedTrack = createUploadedBackgroundMusicTrack(file.name, dataUrl, file.type || undefined);
+
+    const customTracks = await loadCustomTracksFromStorage();
+    customTracks.push(uploadedTrack);
+    await browser.storage.local.set({
+      [BACKGROUND_MUSIC_STORAGE_KEYS.customTracks]: customTracks,
+      [BACKGROUND_MUSIC_STORAGE_KEYS.trackId]: uploadedTrack.id,
+    });
+
+    backgroundMusicTracks = mergeBackgroundMusicTracks(customTracks);
+    renderBackgroundMusicTrackOptions(uploadedTrack.id);
+    setStatus(`Uploaded: ${uploadedTrack.label}`);
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+async function loadBackgroundMusicTracks() {
+  const customTracks = await loadCustomTracksFromStorage();
+  return mergeBackgroundMusicTracks(customTracks);
+}
+
+async function loadCustomTracksFromStorage() {
+  try {
+    const result = await browser.storage.local.get([BACKGROUND_MUSIC_STORAGE_KEYS.customTracks]);
+    const tracks = result[BACKGROUND_MUSIC_STORAGE_KEYS.customTracks];
+    if (Array.isArray(tracks)) {
+      return tracks.filter((track) => track && track.kind === 'custom');
+    }
+  } catch {
+    // ignore
+  }
+
+  return [];
+}
+
+function getBackgroundMusicTrackLabel(trackId: string) {
+  return backgroundMusicTracks.find((track) => track.id === trackId)?.label ?? trackId;
+}
+
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read audio file.'));
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.readAsDataURL(file);
+  });
 }
 
 async function getActiveTab() {

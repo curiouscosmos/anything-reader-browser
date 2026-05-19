@@ -1,5 +1,14 @@
 // @ts-nocheck
 import { isFirefoxRuntime } from '@/lib/browser-flavor.ts';
+import {
+  BACKGROUND_MUSIC_STORAGE_KEYS,
+  BUILTIN_BACKGROUND_MUSIC_TRACKS,
+  DEFAULT_BACKGROUND_MUSIC_VOLUME,
+  getBuiltinBackgroundMusicTrack,
+  getDefaultBackgroundMusicTrackId,
+  mergeBackgroundMusicTracks,
+  normalizeBackgroundMusicTrackId,
+} from '@/lib/background-music.ts';
 import { sendFirefoxTtsMessage } from '@/lib/firefox-tts-client.ts';
 import type { KittenTtsAction } from '@/lib/kitten-tts-engine.ts';
 import { EXTRACT_READABLE_TEXT_MESSAGE } from '@/lib/native-messaging.ts';
@@ -185,7 +194,16 @@ class TTSManager {
     this.audioPlaybackUnlocked = false;
     this.currentAudioSource = null;
     this.currentAudioBuffer = null;
+    this.backgroundMusicEnabled = false;
+    this.backgroundMusicVolume = DEFAULT_BACKGROUND_MUSIC_VOLUME;
+    this.backgroundMusicTrackId = getDefaultBackgroundMusicTrackId();
+    this.backgroundMusicTracks = [...BUILTIN_BACKGROUND_MUSIC_TRACKS];
+    this.backgroundMusicBufferCache = new Map();
+    this.backgroundMusicSource = null;
+    this.backgroundMusicGainNode = null;
+    this.backgroundMusicTrackLoadPromise = null;
     this.setupFirefoxAudioUnlockListeners();
+    this.setupBackgroundMusicEventListeners();
 
     // Warm the offscreen Supertonic runtime as soon as the content script loads.
     this.warmupTTSModel();
@@ -257,6 +275,298 @@ class TTSManager {
     } catch (error) {
       this.warn('Firefox audio unlock failed:', error);
     }
+  }
+
+  setupBackgroundMusicEventListeners() {
+    if (this.backgroundMusicEventListenersReady) {
+      return;
+    }
+
+    this.backgroundMusicEventListenersReady = true;
+
+    const handleStart = () => {
+      void this.startBackgroundMusic();
+    };
+
+    const handleStop = () => {
+      this.stopBackgroundMusic();
+    };
+
+    window.addEventListener('anything-reader:tts-playback-start', handleStart);
+    window.addEventListener('anything-reader:tts-playback-stop', handleStop);
+
+    this.backgroundMusicEventCleanup = () => {
+      window.removeEventListener('anything-reader:tts-playback-start', handleStart);
+      window.removeEventListener('anything-reader:tts-playback-stop', handleStop);
+      this.backgroundMusicEventListenersReady = false;
+    };
+  }
+
+  dispatchBackgroundMusicPlaybackState(isPlaying) {
+    window.dispatchEvent(
+      new CustomEvent('anything-reader:tts-playback-state', {
+        detail: { isPlaying: Boolean(isPlaying) },
+      }),
+    );
+    window.dispatchEvent(
+      new Event(isPlaying ? 'anything-reader:tts-playback-start' : 'anything-reader:tts-playback-stop'),
+    );
+  }
+
+  async startBackgroundMusic() {
+    if (!this.backgroundMusicEnabled || (this.backgroundMusicVolume ?? 0) <= 0) {
+      return;
+    }
+
+    try {
+      if (!this.audioContext) {
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      const audioContext = this.audioContext;
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
+      if (this.backgroundMusicSource) {
+        this.updateBackgroundMusicVolume();
+        return;
+      }
+
+      if (!this.backgroundMusicTracks.length) {
+        await this.loadBackgroundMusicTracks();
+      }
+
+      const track = this.getSelectedBackgroundMusicTrack();
+      if (!track) {
+        return;
+      }
+
+      const audioBuffer = await this.loadBackgroundMusicAudioBuffer(track, audioContext);
+      if (!audioBuffer) {
+        return;
+      }
+
+      const source = audioContext.createBufferSource();
+      const gainNode = audioContext.createGain();
+      const filterNode = audioContext.createBiquadFilter();
+
+      source.buffer = audioBuffer;
+      source.loop = true;
+      filterNode.type = 'lowpass';
+      filterNode.frequency.value = 1200;
+      filterNode.Q.value = 0.7;
+
+      source.connect(filterNode);
+      filterNode.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      gainNode.gain.value = Math.max(0, Math.min(1, (this.backgroundMusicVolume ?? 0) / 100));
+      source.start(0);
+
+      source.onended = () => {
+        if (this.backgroundMusicSource === source) {
+          this.backgroundMusicSource = null;
+          this.backgroundMusicGainNode = null;
+        }
+      };
+
+      this.backgroundMusicSource = source;
+      this.backgroundMusicGainNode = gainNode;
+    } catch (error) {
+      this.warn('Failed to start background music:', error);
+    }
+  }
+
+  stopBackgroundMusic() {
+    if (this.backgroundMusicSource) {
+      try {
+        this.backgroundMusicSource.onended = null;
+        this.backgroundMusicSource.stop();
+        this.backgroundMusicSource.disconnect();
+      } catch (error) {
+        this.warn('Failed to stop background music source:', error);
+      }
+    }
+
+    if (this.backgroundMusicGainNode) {
+      try {
+        this.backgroundMusicGainNode.disconnect();
+      } catch (error) {
+        this.warn('Failed to stop background music gain node:', error);
+      }
+    }
+
+    this.backgroundMusicSource = null;
+    this.backgroundMusicGainNode = null;
+  }
+
+  updateBackgroundMusicVolume() {
+    if (!this.backgroundMusicEnabled || (this.backgroundMusicVolume ?? 0) <= 0) {
+      this.stopBackgroundMusic();
+      return;
+    }
+
+    if (!this.backgroundMusicGainNode) {
+      return;
+    }
+
+    const gain = Math.max(0, Math.min(1, (this.backgroundMusicVolume ?? 0) / 100));
+    const audioContext = this.audioContext;
+    if (audioContext) {
+      this.backgroundMusicGainNode.gain.setTargetAtTime(gain, audioContext.currentTime, 0.02);
+    } else {
+      this.backgroundMusicGainNode.gain.value = gain;
+    }
+
+    if (gain <= 0) {
+      this.stopBackgroundMusic();
+    }
+  }
+
+  async loadBackgroundMusicTracks() {
+    try {
+      const customTracks = await this.loadCustomBackgroundMusicTracks();
+      this.backgroundMusicTracks = mergeBackgroundMusicTracks(customTracks);
+
+      const selectedTrackId = this.getSelectedBackgroundMusicTrackId();
+      if (!this.backgroundMusicTracks.some((track) => track.id === selectedTrackId)) {
+        this.backgroundMusicTrackId = getDefaultBackgroundMusicTrackId();
+        await this.saveBackgroundMusicTrackSetting(this.backgroundMusicTrackId);
+      }
+    } catch (error) {
+      this.warn('Failed to load background music tracks:', error);
+      this.backgroundMusicTracks = [...BUILTIN_BACKGROUND_MUSIC_TRACKS];
+    }
+  }
+
+  getSelectedBackgroundMusicTrackId() {
+    return normalizeBackgroundMusicTrackId(this.backgroundMusicTrackId);
+  }
+
+  getSelectedBackgroundMusicTrack() {
+    const trackId = this.getSelectedBackgroundMusicTrackId();
+    return this.backgroundMusicTracks.find((track) => track.id === trackId)
+      ?? getBuiltinBackgroundMusicTrack(trackId)
+      ?? this.backgroundMusicTracks[0]
+      ?? null;
+  }
+
+  async loadBackgroundMusicAudioBuffer(track, audioContext) {
+    if (!track) {
+      return null;
+    }
+
+    const cacheKey = `${track.id}:${audioContext.sampleRate}`;
+    if (this.backgroundMusicBufferCache.has(cacheKey)) {
+      return this.backgroundMusicBufferCache.get(cacheKey);
+    }
+
+    const sourceUrl = track.kind === 'builtin'
+      ? chrome.runtime.getURL(track.assetPath || '')
+      : track.dataUrl;
+
+    if (!sourceUrl) {
+      return null;
+    }
+
+    const response = await fetch(sourceUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to load background music track: ${track.label}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+    this.backgroundMusicBufferCache.set(cacheKey, audioBuffer);
+    return audioBuffer;
+  }
+
+  async loadCustomBackgroundMusicTracks() {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get([BACKGROUND_MUSIC_STORAGE_KEYS.customTracks], (result) => {
+          const tracks = Array.isArray(result[BACKGROUND_MUSIC_STORAGE_KEYS.customTracks])
+            ? result[BACKGROUND_MUSIC_STORAGE_KEYS.customTracks]
+            : [];
+          resolve(tracks.filter((track) => track && track.kind === 'custom'));
+        });
+      } catch (error) {
+        this.warn('Failed to load custom background music tracks:', error);
+        resolve([]);
+      }
+    });
+  }
+
+  async saveBackgroundMusicTrackSetting(trackId) {
+    const safeTrackId = normalizeBackgroundMusicTrackId(trackId);
+    this.backgroundMusicTrackId = safeTrackId;
+    try {
+      await chrome.storage.local.set({ [BACKGROUND_MUSIC_STORAGE_KEYS.trackId]: safeTrackId });
+      localStorage.setItem(BACKGROUND_MUSIC_STORAGE_KEYS.trackId, JSON.stringify(safeTrackId));
+    } catch (error) {
+      this.warn('Failed to save background music track:', error);
+      try {
+        localStorage.setItem(BACKGROUND_MUSIC_STORAGE_KEYS.trackId, JSON.stringify(safeTrackId));
+      } catch (localError) {
+        this.error('Failed to save background music track to localStorage as well:', localError);
+      }
+    }
+
+    if (this.backgroundMusicSource && this.isPlaying && !this.isPaused) {
+      this.stopBackgroundMusic();
+      await this.startBackgroundMusic();
+    }
+  }
+
+  async saveBackgroundMusicEnabledSetting(enabled) {
+    this.backgroundMusicEnabled = Boolean(enabled);
+    try {
+      await chrome.storage.sync.set({ [BACKGROUND_MUSIC_STORAGE_KEYS.enabled]: this.backgroundMusicEnabled });
+      localStorage.setItem(BACKGROUND_MUSIC_STORAGE_KEYS.enabled, JSON.stringify(this.backgroundMusicEnabled));
+    } catch (error) {
+      this.warn('Failed to save background music enabled flag:', error);
+      try {
+        localStorage.setItem(BACKGROUND_MUSIC_STORAGE_KEYS.enabled, JSON.stringify(this.backgroundMusicEnabled));
+      } catch (localError) {
+        this.error('Failed to save background music enabled flag to localStorage as well:', localError);
+      }
+    }
+
+    if (!this.backgroundMusicEnabled) {
+      this.stopBackgroundMusic();
+    }
+  }
+
+  async loadBackgroundMusicEnabledSetting() {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.sync.get([BACKGROUND_MUSIC_STORAGE_KEYS.enabled], (result) => {
+          if (typeof result[BACKGROUND_MUSIC_STORAGE_KEYS.enabled] === 'boolean') {
+            resolve(result[BACKGROUND_MUSIC_STORAGE_KEYS.enabled]);
+            return;
+          }
+
+          try {
+            const saved = localStorage.getItem(BACKGROUND_MUSIC_STORAGE_KEYS.enabled);
+            if (saved !== null) {
+              const parsed = JSON.parse(saved);
+              if (typeof parsed === 'boolean') {
+                chrome.storage.sync.set({ [BACKGROUND_MUSIC_STORAGE_KEYS.enabled]: parsed }).catch(() => {});
+                resolve(parsed);
+                return;
+              }
+            }
+          } catch (error) {
+            this.warn('Failed to load background music enabled from localStorage:', error);
+          }
+
+          resolve(false);
+        });
+      } catch (error) {
+        this.warn('Failed to load background music enabled setting:', error);
+        resolve(false);
+      }
+    });
   }
 
   createWebAudioPlayer(audioBuffer) {
@@ -370,10 +680,10 @@ class TTSManager {
             clearInterval(this._timeUpdateInterval);
             this._timeUpdateInterval = null;
           }
-          if (this._onended) {
-            this._onended();
-          }
-        };
+      if (this._onended) {
+        this._onended();
+      }
+      };
 
         return Promise.resolve();
       },
@@ -536,6 +846,9 @@ class TTSManager {
           model: this.ttsModel,
           voiceId: this.selectedVoice?.id,
           speed: this.playbackSpeed,
+          backgroundMusicEnabled: this.backgroundMusicEnabled,
+          backgroundMusicTrackId: this.backgroundMusicTrackId,
+          backgroundMusicVolume: this.backgroundMusicVolume,
           pluginEnabled: this.isPluginEnabled,
           floatingBarVisible: this.floatingBarVisible,
           takeListVisible: this.takeListVisible,
@@ -611,6 +924,27 @@ class TTSManager {
             this.updateSpeedUI();
             this.updateBottomFloatingUIState();
             this.handleExternalVoiceOrSpeedChange('speed_change');
+          }
+        }
+
+        if (changes['ar-background-music-volume']) {
+          const newVolume = Number(changes['ar-background-music-volume'].newValue);
+          if (Number.isFinite(newVolume)) {
+            const safeVolume = Math.max(0, Math.min(100, Math.round(newVolume)));
+            if (safeVolume !== this.backgroundMusicVolume) {
+              this.backgroundMusicVolume = safeVolume;
+              this.updateBackgroundMusicVolume();
+            }
+          }
+        }
+
+        if (changes[BACKGROUND_MUSIC_STORAGE_KEYS.enabled]) {
+          const newEnabled = Boolean(changes[BACKGROUND_MUSIC_STORAGE_KEYS.enabled].newValue);
+          if (newEnabled !== this.backgroundMusicEnabled) {
+            this.backgroundMusicEnabled = newEnabled;
+            if (!this.backgroundMusicEnabled) {
+              this.stopBackgroundMusic();
+            }
           }
         }
 
@@ -704,6 +1038,31 @@ class TTSManager {
                 this.updateBottomFloatingUITheme();
       }
     }
+          }
+        }
+      }
+
+      if (areaName === 'local') {
+        if (changes[BACKGROUND_MUSIC_STORAGE_KEYS.trackId]) {
+          const newTrackId = normalizeBackgroundMusicTrackId(changes[BACKGROUND_MUSIC_STORAGE_KEYS.trackId].newValue);
+          if (newTrackId !== this.backgroundMusicTrackId) {
+            this.backgroundMusicTrackId = newTrackId;
+            if (this.backgroundMusicSource && this.isPlaying && !this.isPaused) {
+              this.stopBackgroundMusic();
+              void this.startBackgroundMusic();
+            }
+          }
+        }
+
+        if (changes[BACKGROUND_MUSIC_STORAGE_KEYS.customTracks]) {
+          this.backgroundMusicTracks = mergeBackgroundMusicTracks(
+            Array.isArray(changes[BACKGROUND_MUSIC_STORAGE_KEYS.customTracks].newValue)
+              ? changes[BACKGROUND_MUSIC_STORAGE_KEYS.customTracks].newValue.filter((track) => track && track.kind === 'custom')
+              : [],
+          );
+          if (this.backgroundMusicSource && this.isPlaying && !this.isPaused) {
+            this.stopBackgroundMusic();
+            void this.startBackgroundMusic();
           }
         }
       }
@@ -2153,6 +2512,25 @@ class TTSManager {
         settingsChanged = true;
       }
 
+      const backgroundMusicEnabled = await this.loadBackgroundMusicEnabledSetting();
+      if (backgroundMusicEnabled !== this.backgroundMusicEnabled) {
+        this.backgroundMusicEnabled = backgroundMusicEnabled;
+        settingsChanged = true;
+      }
+
+      const backgroundMusicTrackId = await this.loadBackgroundMusicTrackSetting();
+      if (backgroundMusicTrackId !== this.backgroundMusicTrackId) {
+        this.backgroundMusicTrackId = backgroundMusicTrackId;
+        settingsChanged = true;
+      }
+
+      const backgroundMusicVolume = await this.loadBackgroundMusicVolumeSetting();
+      if (backgroundMusicVolume !== this.backgroundMusicVolume) {
+        this.backgroundMusicVolume = backgroundMusicVolume;
+        this.updateBackgroundMusicVolume();
+        settingsChanged = true;
+      }
+
       this.takeListVisible = await this.loadTakeListVisibilitySetting();
 
       this.floatingBarVisible = await this.loadFloatingBarVisibilitySetting();
@@ -2189,11 +2567,96 @@ class TTSManager {
         settingsChanged = true;
       }
 
+      await this.loadBackgroundMusicTracks();
+
       return settingsChanged;
     } catch (error) {
       this.warn('Error while loading settings:', error);
       return false;
     }
+  }
+
+  async saveBackgroundMusicVolumeSetting(volume) {
+    const safeVolume = Math.max(0, Math.min(100, Math.round(volume)));
+    try {
+      await chrome.storage.sync.set({ 'ar-background-music-volume': safeVolume });
+      localStorage.setItem('ar-background-music-volume', safeVolume.toString());
+    } catch (error) {
+      this.warn('Failed to save background music volume:', error);
+      try {
+        localStorage.setItem('ar-background-music-volume', safeVolume.toString());
+      } catch (localError) {
+        this.error('Failed to save background music volume to localStorage as well:', localError);
+      }
+    }
+
+    this.backgroundMusicVolume = safeVolume;
+    this.updateBackgroundMusicVolume();
+  }
+
+  async loadBackgroundMusicVolumeSetting() {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.sync.get(['ar-background-music-volume'], (result) => {
+          const stored = result['ar-background-music-volume'];
+          if (typeof stored === 'number' && Number.isFinite(stored)) {
+            resolve(Math.max(0, Math.min(100, Math.round(stored))));
+            return;
+          }
+
+          try {
+            const localStored = localStorage.getItem('ar-background-music-volume');
+            if (localStored !== null) {
+              const parsed = Number(localStored);
+              if (Number.isFinite(parsed)) {
+                const safeVolume = Math.max(0, Math.min(100, Math.round(parsed)));
+                chrome.storage.sync.set({ 'ar-background-music-volume': safeVolume }).catch(() => {});
+                resolve(safeVolume);
+                return;
+              }
+            }
+          } catch (error) {
+            this.warn('Failed to load background music volume from localStorage:', error);
+          }
+
+          resolve(DEFAULT_BACKGROUND_MUSIC_VOLUME);
+        });
+      } catch (error) {
+        this.warn('Failed to load background music volume setting:', error);
+        resolve(DEFAULT_BACKGROUND_MUSIC_VOLUME);
+      }
+    });
+  }
+
+  async loadBackgroundMusicTrackSetting() {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get([BACKGROUND_MUSIC_STORAGE_KEYS.trackId], (result) => {
+          const stored = result[BACKGROUND_MUSIC_STORAGE_KEYS.trackId];
+          if (typeof stored === 'string' && stored.trim()) {
+            resolve(normalizeBackgroundMusicTrackId(stored));
+            return;
+          }
+
+          try {
+            const saved = localStorage.getItem(BACKGROUND_MUSIC_STORAGE_KEYS.trackId);
+            if (saved) {
+              const parsed = normalizeBackgroundMusicTrackId(JSON.parse(saved));
+              chrome.storage.local.set({ [BACKGROUND_MUSIC_STORAGE_KEYS.trackId]: parsed }).catch(() => {});
+              resolve(parsed);
+              return;
+            }
+          } catch (error) {
+            this.warn('Failed to load background music track from localStorage:', error);
+          }
+
+          resolve(getDefaultBackgroundMusicTrackId());
+        });
+      } catch (error) {
+        this.warn('Failed to load background music track setting:', error);
+        resolve(getDefaultBackgroundMusicTrackId());
+      }
+    });
   }
 
   updateVoiceUI() {
@@ -3547,6 +4010,7 @@ class TTSManager {
 
     if (!this.currentPlayList || playListIndex >= this.currentPlayList.length) {
       this.updateStatus('Playback complete', '#4CAF50');
+      this.dispatchBackgroundMusicPlaybackState(false);
       return;
     }
 
@@ -3770,6 +4234,7 @@ class TTSManager {
             this.isPlaying = false;
             this.isPaused = false;
             this.updateBottomFloatingUIState();
+            this.dispatchBackgroundMusicPlaybackState(false);
             resolve();
             return;
           }
@@ -3789,6 +4254,7 @@ class TTSManager {
             this.isPaused = false;
             this.updateBottomFloatingUIState();
             this.updateStatus('Playback complete', '#4CAF50');
+            this.dispatchBackgroundMusicPlaybackState(false);
           }
           resolve();
         }, this.ttsModel === 'kitten' ? 50 : 500);
@@ -3800,13 +4266,16 @@ class TTSManager {
         this.isPaused = false;
         this.updateStatus('Playback error', '#F44336');
         this.stopWordTracking();
+        this.dispatchBackgroundMusicPlaybackState(false);
 
         this.updateBottomFloatingUIState();
 
         reject(error);
       };
 
-      this.currentAudio.play().catch(reject);
+      this.currentAudio.play().then(() => {
+        this.dispatchBackgroundMusicPlaybackState(true);
+      }).catch(reject);
     });
   }
 
@@ -7156,6 +7625,7 @@ class TTSManager {
             }
           } else {
             this.updateStatus('Playback complete', '#4CAF50');
+            this.dispatchBackgroundMusicPlaybackState(false);
             setTimeout(() => this.hideUI(), 3000);
           }
 
@@ -7167,6 +7637,7 @@ class TTSManager {
         this.error('Audio playback error:', error);
         this.updateStatus('Playback error', '#F44336');
         this.stopWordTracking();
+        this.dispatchBackgroundMusicPlaybackState(false);
         reject(error);
       };
 
@@ -7186,6 +7657,7 @@ class TTSManager {
 
       this.currentAudio.play().then(() => {
         console.info('[Anything Reader][FirefoxPlayback] play() resolved');
+        this.dispatchBackgroundMusicPlaybackState(true);
       }).catch((error) => {
         console.error('[Anything Reader][FirefoxPlayback] play() rejected', error);
         reject(error);

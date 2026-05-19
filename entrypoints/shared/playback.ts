@@ -27,6 +27,9 @@ export function stopAll(manager) {
   if (typeof manager.unwrapWords === 'function') {
     manager.unwrapWords();
   }
+  if (typeof manager.dispatchBackgroundMusicPlaybackState === 'function') {
+    manager.dispatchBackgroundMusicPlaybackState(false);
+  }
 
   manager.isPlaying = false;
   manager.isPaused = false;
@@ -81,6 +84,9 @@ export function pausePlayback(manager) {
   if (manager.currentAudio) {
     manager.currentAudio.pause();
   }
+  if (typeof manager.dispatchBackgroundMusicPlaybackState === 'function') {
+    manager.dispatchBackgroundMusicPlaybackState(false);
+  }
 
   manager.shouldStopSequentialPlayback = true;
   const nextIndex = typeof manager.currentTakeIndex === 'number' ? manager.currentTakeIndex + 1 : null;
@@ -98,7 +104,13 @@ export function resumePlayback(manager) {
   }
 
   if (manager.currentAudio && manager.isPaused) {
-    manager.currentAudio.play();
+    manager.currentAudio.play().then(() => {
+      if (typeof manager.dispatchBackgroundMusicPlaybackState === 'function') {
+        manager.dispatchBackgroundMusicPlaybackState(true);
+      }
+    }).catch((error) => {
+      manager.warn?.('Failed to resume current audio playback:', error);
+    });
     manager.isPaused = false;
     manager.isPlaying = true;
     manager.shouldStopSequentialPlayback = false;
@@ -114,6 +126,9 @@ export function resumePlayback(manager) {
     manager.isPlaying = true;
     manager.shouldStopSequentialPlayback = false;
     manager.pauseResumeTargetIndex = null;
+    if (typeof manager.dispatchBackgroundMusicPlaybackState === 'function') {
+      manager.dispatchBackgroundMusicPlaybackState(true);
+    }
     manager.updateBottomFloatingUIState();
     if (typeof manager.playTakeAtIndex === 'function') {
       void manager.playTakeAtIndex(resumeIndex);

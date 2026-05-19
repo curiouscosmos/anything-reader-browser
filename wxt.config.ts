@@ -7,8 +7,8 @@ export default defineConfig({
     name: 'Anything Reader',
     permissions:
       browser === 'firefox'
-        ? ['activeTab', 'contextMenus', 'nativeMessaging', 'storage', 'tabs']
-        : ['activeTab', 'contextMenus', 'nativeMessaging', 'offscreen', 'storage', 'tabs'],
+        ? ['activeTab', 'contextMenus', 'nativeMessaging', 'storage', 'tabs', 'unlimitedStorage']
+        : ['activeTab', 'contextMenus', 'nativeMessaging', 'offscreen', 'storage', 'tabs', 'unlimitedStorage'],
     icons: {
       16: 'icon16_on.png',
       32: 'icon32_on.png',
@@ -37,8 +37,8 @@ export default defineConfig({
       {
         resources:
           browser === 'firefox'
-            ? ['icon*.png', 'speaker.svg', 'kittenTTS/*', 'supertonic/ort/*', 'reader.html', 'reader.js', 'reader-init.js']
-            : ['icon*.png', 'speaker.svg', 'supertonic/onnx/*', 'supertonic/ort/*', 'reader.html', 'reader.js', 'reader-init.js', 'supertonic/voice_styles/*'],
+            ? ['icon*.png', 'speaker.svg', 'audio/*', 'kittenTTS/*', 'supertonic/ort/*', 'reader.html', 'reader.js', 'reader-init.js']
+            : ['icon*.png', 'speaker.svg', 'audio/*', 'supertonic/onnx/*', 'supertonic/ort/*', 'reader.html', 'reader.js', 'reader-init.js', 'supertonic/voice_styles/*'],
         matches: ['<all_urls>'],
       },
     ],

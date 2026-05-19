@@ -113,6 +113,16 @@ input[type="checkbox"] {
   gap: 5px;
 }
 
+.background-music-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.background-music-controls[hidden] {
+  display: none !important;
+}
+
 select {
   width: 100%;
   min-height: 34px;
@@ -122,6 +132,16 @@ select {
   background: #ffffff;
   color: #202124;
   font: inherit;
+}
+
+input[type="range"] {
+  width: 100%;
+  margin: 0;
+}
+
+.field small {
+  color: #6f7681;
+  font-size: 11px;
 }
 
 .color-picker {
