@@ -1,4 +1,5 @@
 import { isFirefoxRuntime } from '@/lib/browser-flavor.ts';
+import { devLog } from "@/lib/devlog.ts";
 import { getKittenOrtWasmPaths } from '@/lib/ort-runtime.ts';
 import {
   FIREFOX_TTS_HOST_PAGE,
@@ -462,7 +463,7 @@ async function preloadTtsModel() {
     const model = isFirefoxRuntime() ? 'kitten' : settings['ar-tts-model'] === 'supertonic' ? 'supertonic' : 'kitten';
     await sendTtsMessage('tts-initialize', { model });
   } catch (error) {
-    console.warn('[Anything Reader][Background] TTS preload failed', error);
+    devLog('[Anything Reader][Background] TTS preload failed', error);
   }
 }
 

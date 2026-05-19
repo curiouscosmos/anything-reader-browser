@@ -1,4 +1,5 @@
 import * as ort from 'onnxruntime-web';
+import { devLog } from "@/lib/devlog.ts";
 import { phonemize } from 'phonemizer';
 import { isFirefoxRuntime } from '@/lib/browser-flavor.ts';
 import type { OrtWasmPaths } from '@/lib/ort-runtime.ts';
@@ -121,7 +122,7 @@ export function createSupertonicTtsEngine(options: TtsEngineOptions) {
 
     if (!supertonicEngine.loading) {
       supertonicEngine.loading = (async () => {
-        console.log(options.debugPrefix, 'Loading Supertonic assets', {
+        devLog(options.debugPrefix, 'Loading Supertonic assets', {
           models: options.modelRoot,
           voices: options.voiceStyleRoot,
           wasm: options.ortWasmRoot,
@@ -135,7 +136,7 @@ export function createSupertonicTtsEngine(options: TtsEngineOptions) {
         supertonicEngine.textToSpeech = textToSpeech;
         supertonicEngine.ready = true;
 
-        console.log(options.debugPrefix, 'Supertonic TTS ready');
+        devLog(options.debugPrefix, 'Supertonic TTS ready');
       })().catch((error) => {
         supertonicEngine.loading = null;
         supertonicEngine.textToSpeech = null;
@@ -158,7 +159,7 @@ export function createSupertonicTtsEngine(options: TtsEngineOptions) {
 
     if (!kittenEngine.loading) {
       kittenEngine.loading = (async () => {
-        console.log(options.debugPrefix, 'Loading KittenTTS assets', {
+        devLog(options.debugPrefix, 'Loading KittenTTS assets', {
           root: options.kittenRoot,
           wasm: options.ortWasmRoot,
           providers: options.primaryExecutionProviders,
@@ -179,7 +180,7 @@ export function createSupertonicTtsEngine(options: TtsEngineOptions) {
         kittenEngine.session = session;
         kittenEngine.ready = true;
 
-        console.log(options.debugPrefix, 'KittenTTS ready');
+        devLog(options.debugPrefix, 'KittenTTS ready');
       })().catch((error) => {
         kittenEngine.loading = null;
         kittenEngine.session = null;
@@ -201,7 +202,7 @@ export function createSupertonicTtsEngine(options: TtsEngineOptions) {
     const primaryProviders = options.primaryExecutionProviders;
     const fallbackProviders = options.fallbackExecutionProviders ?? ['wasm'];
     const progress = (providerLabel: string) => (modelName: string, current: number, total: number) => {
-      console.log(options.debugPrefix, `Loading ONNX model with ${providerLabel} (${current}/${total})`, modelName);
+      devLog(options.debugPrefix, `Loading ONNX model with ${providerLabel} (${current}/${total})`, modelName);
     };
 
     try {
@@ -218,7 +219,7 @@ export function createSupertonicTtsEngine(options: TtsEngineOptions) {
         throw error;
       }
 
-      console.warn(options.debugPrefix, `Provider ${primaryProviders.join('/')} failed, retrying with ${fallbackProviders.join('/')}`, error);
+      devLog(options.debugPrefix, `Provider ${primaryProviders.join('/')} failed, retrying with ${fallbackProviders.join('/')}`, error);
       return loadTextToSpeech(
         options.modelRoot,
         {
@@ -281,7 +282,7 @@ export function createSupertonicTtsEngine(options: TtsEngineOptions) {
       throw new Error('KittenTTS voices were not loaded.');
     }
     if (!kittenEngine.voices.has(voiceId)) {
-      console.warn(options.debugPrefix, 'KittenTTS voice fallback in use', {
+      devLog(options.debugPrefix, 'KittenTTS voice fallback in use', {
         requestedVoiceId: data.voiceId,
         resolvedVoiceId: voiceId,
         loadedVoices: [...kittenEngine.voices.keys()],
@@ -320,7 +321,7 @@ export function createSupertonicTtsEngine(options: TtsEngineOptions) {
     }
 
     const voiceStyleUrl = `${options.voiceStyleRoot}/${voiceId}.json`;
-    console.log(options.debugPrefix, 'Loading voice style', { voiceId, voiceStyleUrl });
+    devLog(options.debugPrefix, 'Loading voice style', { voiceId, voiceStyleUrl });
     const style = await loadVoiceStyle([voiceStyleUrl], true);
     supertonicEngine.voiceStyles.set(voiceId, style);
     return style;
@@ -339,7 +340,7 @@ export function createSupertonicTtsEngine(options: TtsEngineOptions) {
         throw error;
       }
 
-      console.warn(options.debugPrefix, `KittenTTS provider ${primaryProviders.join('/')} failed, retrying with ${fallbackProviders.join('/')}`, error);
+      devLog(options.debugPrefix, `KittenTTS provider ${primaryProviders.join('/')} failed, retrying with ${fallbackProviders.join('/')}`, error);
       return ort.InferenceSession.create(modelPath, {
         executionProviders: fallbackProviders,
         graphOptimizationLevel: 'all',

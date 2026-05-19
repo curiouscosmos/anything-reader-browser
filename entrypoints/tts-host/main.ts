@@ -1,4 +1,5 @@
 import { createKittenTtsEngine, type KittenTtsAction } from '@/lib/kitten-tts-engine.ts';
+import { devLog } from "@/lib/devlog.ts";
 import {
   FIREFOX_TTS_HOST_PORT_NAME,
   FIREFOX_TTS_REQUEST_KEY_PREFIX,
@@ -56,7 +57,7 @@ window.__anythingReaderFirefoxTtsHandle = async (action, data) => kittenTtsEngin
 
 browser.runtime.onMessage.addListener((message, sender) => {
   if (isReadCurrentPageRequest(message)) {
-    console.info('[Anything Reader][FirefoxBackground] read request received');
+    devLog('[Anything Reader][FirefoxBackground] read request received');
     return readCurrentPageAndSendToMac(message.summarize === true)
       .catch((error) => {
         console.error('[Anything Reader][FirefoxBackground] Native messaging request failed', error);
@@ -68,10 +69,10 @@ browser.runtime.onMessage.addListener((message, sender) => {
   }
 
   if (isTtsMessage(message)) {
-    console.info('[Anything Reader][FirefoxBackground] tts request received', message.action, summarizeTtsMessage(message));
+    devLog('[Anything Reader][FirefoxBackground] tts request received', message.action, summarizeTtsMessage(message));
     return sendTtsMessage(message.action, message.data)
       .then((result) => {
-        console.info('[Anything Reader][FirefoxBackground] tts response ready', message.action, summarizeTtsResponse(result));
+        devLog('[Anything Reader][FirefoxBackground] tts response ready', message.action, summarizeTtsResponse(result));
         return result;
       })
       .catch((error) => {
@@ -301,7 +302,7 @@ async function handleDemoMessage(message: DemoMessage, sender: { tab?: { id?: nu
 }
 
 async function sendTtsMessage(action: KittenTtsAction, data?: unknown) {
-  console.info('[Anything Reader][FirefoxBackground] sendTtsMessage', action, summarizeTtsMessage({ action, data }));
+  devLog('[Anything Reader][FirefoxBackground] sendTtsMessage', action, summarizeTtsMessage({ action, data }));
   return kittenTtsEngine.handle(action, data ?? {});
 }
 
@@ -333,10 +334,10 @@ async function handleFirefoxStorageRequest(requestKey: string, request: FirefoxT
 
 async function preloadTtsModel() {
   try {
-    console.info('[Anything Reader][FirefoxBackground] preloading KittenTTS');
+    devLog('[Anything Reader][FirefoxBackground] preloading KittenTTS');
     await sendTtsMessage('tts-initialize', { model: 'kitten' });
   } catch (error) {
-    console.warn('[Anything Reader][FirefoxBackground] TTS preload failed', error);
+    devLog('[Anything Reader][FirefoxBackground] TTS preload failed', error);
   }
 }
 

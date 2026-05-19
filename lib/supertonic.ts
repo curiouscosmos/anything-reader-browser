@@ -1,4 +1,5 @@
 import * as ort from 'onnxruntime-web';
+import { devLog } from "@/lib/devlog.ts";
 import type { OrtWasmPaths } from '@/lib/ort-runtime.ts';
 
 export const AVAILABLE_LANGS = ['en', 'ko', 'ja', 'ar', 'bg', 'cs', 'da', 'de', 'el', 'es', 'et', 'fi', 'fr', 'hi', 'hr', 'hu', 'id', 'it', 'lt', 'lv', 'nl', 'pl', 'pt', 'ro', 'ru', 'sk', 'sl', 'sv', 'tr', 'uk', 'vi'] as const;
@@ -376,7 +377,7 @@ export async function loadVoiceStyle(voiceStylePaths: string[], verbose = false)
   const dpTensor = new ort.Tensor('float32', dpFlat, [bsz, dpDims[1], dpDims[2]]);
 
   if (verbose) {
-    console.log(`Loaded ${bsz} voice styles`);
+    devLog(`Loaded ${bsz} voice styles`);
   }
 
   return new Style(ttlTensor, dpTensor);

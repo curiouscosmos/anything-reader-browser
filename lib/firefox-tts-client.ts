@@ -1,7 +1,8 @@
 import type { KittenTtsAction } from '@/lib/kitten-tts-engine.ts';
+import { devLog } from "@/lib/devlog.ts";
 
 export async function sendFirefoxTtsMessage(action: KittenTtsAction, data: unknown = {}) {
-  console.info('[Anything Reader][FirefoxTTS] send', action, summarizeFirefoxPayload(data));
+  devLog('[Anything Reader][FirefoxTTS] send', action, summarizeFirefoxPayload(data));
   const response = await browser.runtime.sendMessage({
     action,
     data,
@@ -11,7 +12,7 @@ export async function sendFirefoxTtsMessage(action: KittenTtsAction, data: unkno
     throw new Error('Firefox TTS host did not respond.');
   }
 
-  console.info('[Anything Reader][FirefoxTTS] response', action, summarizeFirefoxResponse(response));
+  devLog('[Anything Reader][FirefoxTTS] response', action, summarizeFirefoxResponse(response));
   return response;
 }
 

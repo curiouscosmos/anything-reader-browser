@@ -210,11 +210,11 @@ class TTSManager {
   }
 
   log(...args) {
-    if (this.DEBUG_MODE) console.log(...args);
+    if (this.DEBUG_MODE) devLog(...args);
   }
 
   warn(...args) {
-    if (this.DEBUG_MODE) console.warn(...args);
+    if (this.DEBUG_MODE) devLog(...args);
   }
 
   error(...args) {
@@ -255,12 +255,12 @@ class TTSManager {
     }
 
     try {
-      console.info('[Anything Reader][FirefoxPlayback] unlock requested');
+      devLog('[Anything Reader][FirefoxPlayback] unlock requested');
       if (!this.audioContext) {
         this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
       }
 
-      console.info('[Anything Reader][FirefoxPlayback] unlock context state', this.audioContext.state);
+      devLog('[Anything Reader][FirefoxPlayback] unlock context state', this.audioContext.state);
       if (this.audioContext.state === 'suspended') {
         await this.audioContext.resume();
       }
@@ -271,7 +271,7 @@ class TTSManager {
       source.connect(this.audioContext.destination);
       source.start(0);
       this.audioPlaybackUnlocked = true;
-      console.info('[Anything Reader][FirefoxPlayback] unlock complete');
+      devLog('[Anything Reader][FirefoxPlayback] unlock complete');
     } catch (error) {
       this.warn('Firefox audio unlock failed:', error);
     }
@@ -622,7 +622,7 @@ class TTSManager {
       async play() {
         if (this._isPlaying && !this._isPaused) return Promise.resolve();
 
-        console.info('[Anything Reader][FirefoxPlayback] webaudio play requested', {
+        devLog('[Anything Reader][FirefoxPlayback] webaudio play requested', {
           paused: this._isPaused,
           state: this._audioContext.state,
           duration: this._duration,
@@ -672,7 +672,7 @@ class TTSManager {
             return;
           }
 
-          console.info('[Anything Reader][FirefoxPlayback] webaudio source ended');
+          devLog('[Anything Reader][FirefoxPlayback] webaudio source ended');
           this._isPlaying = false;
           this._isPaused = false;
           this._currentTime = this._duration;
@@ -691,7 +691,7 @@ class TTSManager {
       pause() {
         if (!this._isPlaying || this._isPaused) return;
 
-        console.info('[Anything Reader][FirefoxPlayback] webaudio pause requested');
+        devLog('[Anything Reader][FirefoxPlayback] webaudio pause requested');
         if (this._source) {
           this._source.onended = null;
           this._source.stop();
@@ -3920,7 +3920,7 @@ class TTSManager {
       return;
     }
 
-    console.info('[Anything Reader][FirefoxPlayback] startPlaybackFromTake', {
+    devLog('[Anything Reader][FirefoxPlayback] startPlaybackFromTake', {
       takeId: startTake?.id,
       textLength: startTake?.text?.length,
       takes: this.preTakes?.length,
@@ -4021,7 +4021,7 @@ class TTSManager {
       return;
     }
 
-    console.info('[Anything Reader][FirefoxPlayback] playTakeAtIndex', {
+    devLog('[Anything Reader][FirefoxPlayback] playTakeAtIndex', {
       playListIndex,
       takeId: take.id,
       textLength: take.text?.length,
@@ -4056,7 +4056,7 @@ class TTSManager {
       } else if (this.audioPrefetchPromises && this.audioPrefetchPromises.has(cacheKey)) {
         audioUrl = await this.audioPrefetchPromises.get(cacheKey);
       } else {
-        console.info('[Anything Reader][FirefoxPlayback] playTakeAtIndex generateTTSAudio request', {
+        devLog('[Anything Reader][FirefoxPlayback] playTakeAtIndex generateTTSAudio request', {
           playListIndex,
           takeId: take.id,
           textLength: take.text?.length,
@@ -4068,7 +4068,7 @@ class TTSManager {
           playAfterGenerate: false,
           context: 'selection'
         });
-        console.info('[Anything Reader][FirefoxPlayback] playTakeAtIndex generateTTSAudio result', {
+        devLog('[Anything Reader][FirefoxPlayback] playTakeAtIndex generateTTSAudio result', {
           playListIndex,
           takeId: take.id,
           hasAudioUrl: Boolean(audioUrl),
@@ -4169,20 +4169,20 @@ class TTSManager {
   async playAudioWithTracking(audioUrl, take) {
     return new Promise((resolve, reject) => {
       const shouldUseWebAudio = this.shouldUseWebAudioPlayback();
-      console.info('[Anything Reader][FirefoxPlayback] playAudioWithTracking branch', {
+      devLog('[Anything Reader][FirefoxPlayback] playAudioWithTracking branch', {
         shouldUseWebAudio,
         type: typeof audioUrl,
         hasAudioBuffer: Boolean(audioUrl && typeof audioUrl === 'object' && audioUrl.audioBuffer),
       });
 
       if (shouldUseWebAudio && audioUrl && typeof audioUrl === 'object' && audioUrl.audioBuffer) {
-        console.info('[Anything Reader][FirefoxPlayback] playAudioWithTracking webaudio', {
+        devLog('[Anything Reader][FirefoxPlayback] playAudioWithTracking webaudio', {
           sampleRate: audioUrl.sampleRate,
           duration: audioUrl.audioBuffer.duration,
         });
         this.currentAudio = this.createWebAudioPlayer(audioUrl.audioBuffer, audioUrl.sampleRate);
                   } else {
-      console.info('[Anything Reader][FirefoxPlayback] playAudioWithTracking htmlaudio', {
+      devLog('[Anything Reader][FirefoxPlayback] playAudioWithTracking htmlaudio', {
         type: typeof audioUrl,
         isBlobUrl: typeof audioUrl === 'string' && audioUrl.startsWith('blob:'),
       });
@@ -6943,7 +6943,7 @@ class TTSManager {
   async generateSingleChunkAudio(text, voice, language, chunkIndexOrAbortController = 0) {
     const chunkIndex = typeof chunkIndexOrAbortController === 'number' ? chunkIndexOrAbortController : 0;
     const abortController = chunkIndexOrAbortController instanceof AbortController ? chunkIndexOrAbortController : this.abortController;
-    console.info('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio entry', {
+    devLog('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio entry', {
       chunkIndex,
       textLength: text?.length,
       voiceId: voice?.id,
@@ -6953,7 +6953,7 @@ class TTSManager {
     });
 
     if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
-      console.warn('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
+      devLog('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
         chunkIndex,
         reason: 'preflight_abort',
         shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
@@ -6971,7 +6971,7 @@ class TTSManager {
 
     try {
       if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
-        console.warn('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
+        devLog('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
           chunkIndex,
           reason: 'aborted_before_tts',
           shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
@@ -6987,7 +6987,7 @@ class TTSManager {
       }
 
       if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
-        console.warn('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
+        devLog('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
           chunkIndex,
           reason: 'aborted_before_decode',
           shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
@@ -7002,13 +7002,13 @@ class TTSManager {
       const qualityStepMap = { 'Fast': 5, 'Balanced': 8, 'Quality': 15 };
       const totalStep = qualityStepMap[this.quality] || 8;
       const pageLang = this.detectPageLanguageForOffscreen();
-      console.info('[Anything Reader][FirefoxPlayback] generateTTSAudio start', {
+      devLog('[Anything Reader][FirefoxPlayback] generateTTSAudio start', {
         chunkIndex,
         textLength: processedText?.length,
         model: this.ttsModel,
         voiceId: this.selectedVoice?.id,
       });
-      console.info('[Anything Reader][FirefoxPlayback] generateTTSAudio send preflight', {
+      devLog('[Anything Reader][FirefoxPlayback] generateTTSAudio send preflight', {
         chunkIndex,
         model: this.ttsModel,
         voiceId: voice.id,
@@ -7027,7 +7027,7 @@ class TTSManager {
           totalStep,
           language: pageLang
         });
-        console.info('[Anything Reader][FirefoxPlayback] tts result received', {
+        devLog('[Anything Reader][FirefoxPlayback] tts result received', {
           chunkIndex,
           success: result?.success,
           sampleRate: result?.sampleRate,
@@ -7043,7 +7043,7 @@ class TTSManager {
       }
 
       if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
-        console.warn('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
+        devLog('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
           chunkIndex,
           reason: 'aborted_before_return',
           shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
@@ -7059,7 +7059,7 @@ class TTSManager {
       }
 
       if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
-        console.warn('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
+        devLog('[Anything Reader][FirefoxPlayback] generateSingleChunkAudio exit', {
           chunkIndex,
           reason: 'abort_in_catch',
           shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
@@ -7084,7 +7084,7 @@ class TTSManager {
       const sampleRate = result.sampleRate;
 
       const shouldUseWebAudio = this.shouldUseWebAudioPlayback();
-      console.info('[Anything Reader][FirefoxPlayback] generation playback branch', {
+      devLog('[Anything Reader][FirefoxPlayback] generation playback branch', {
         shouldUseWebAudio,
         sampleRate,
         audioBuffer: shouldUseWebAudio,
@@ -7093,7 +7093,7 @@ class TTSManager {
       if (shouldUseWebAudio) {
         const audioContext = this.audioContext || new (window.AudioContext || window.webkitAudioContext)();
         this.audioContext = audioContext;
-        console.info('[Anything Reader][FirefoxPlayback] decode audio', {
+        devLog('[Anything Reader][FirefoxPlayback] decode audio', {
           state: audioContext.state,
           sampleRate,
           byteLength: wavBytes.byteLength,
@@ -7103,7 +7103,7 @@ class TTSManager {
         }
         const arrayBuffer = wavBytes.buffer.slice(0, wavBytes.byteLength);
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        console.info('[Anything Reader][FirefoxPlayback] decoded audio buffer', {
+        devLog('[Anything Reader][FirefoxPlayback] decoded audio buffer', {
           duration: audioBuffer.duration,
           sampleRate: audioBuffer.sampleRate,
           length: audioBuffer.length,
@@ -7276,14 +7276,14 @@ class TTSManager {
 
   async generateTTSAudio(take, options = {}) {
     if (!this.isPluginEnabled) {
-      console.warn('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
+      devLog('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
         takeId: take?.id,
         reason: 'plugin_disabled',
       });
       return null;
     }
 
-    console.info('[Anything Reader][FirefoxPlayback] generateTTSAudio entry', {
+    devLog('[Anything Reader][FirefoxPlayback] generateTTSAudio entry', {
       takeId: take?.id,
       textLength: take?.text?.length,
       isGenerating: this.isGenerating,
@@ -7301,11 +7301,11 @@ class TTSManager {
 
     if (this.isGenerating) {
       if (this.isFirefoxOnlyKitten) {
-        console.warn('[Anything Reader][FirefoxPlayback] clearing stale generating flag before playback');
+        devLog('[Anything Reader][FirefoxPlayback] clearing stale generating flag before playback');
         this.isGenerating = false;
         this.currentGeneratingTakeId = null;
       } else {
-        console.warn('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
+        devLog('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
           takeId: take?.id,
           reason: 'already_generating',
         });
@@ -7314,7 +7314,7 @@ class TTSManager {
     }
 
     if (this.shouldStopSequentialPlayback) {
-      console.warn('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
+      devLog('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
         takeId: take?.id,
         reason: 'should_stop_sequential_playback',
       });
@@ -7325,7 +7325,7 @@ class TTSManager {
 
     if (!take || !take.id) {
       this.error(`❌ Invalid take:`, take);
-      console.warn('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
+      devLog('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
         takeId: take?.id,
         reason: 'invalid_take',
       });
@@ -7408,7 +7408,7 @@ class TTSManager {
     let audioUrl = null;
     try {
       if (this.shouldStopSequentialPlayback) {
-        console.warn('[Anything Reader][FirefoxPlayback] generateTTSAudio continue despite stop flag', {
+        devLog('[Anything Reader][FirefoxPlayback] generateTTSAudio continue despite stop flag', {
           takeId: take?.id,
           shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
         });
@@ -7428,7 +7428,7 @@ class TTSManager {
       }
 
       if (this.shouldStopSequentialPlayback || (abortController && abortController.signal?.aborted)) {
-        console.warn('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
+        devLog('[Anything Reader][FirefoxPlayback] generateTTSAudio exit', {
           takeId: take?.id,
           reason: 'aborted_after_generation',
           shouldStopSequentialPlayback: this.shouldStopSequentialPlayback,
@@ -7457,7 +7457,7 @@ class TTSManager {
       this.currentGeneratingTakeId = null;
     }
 
-    console.info('[Anything Reader][FirefoxPlayback] generateTTSAudio return', {
+    devLog('[Anything Reader][FirefoxPlayback] generateTTSAudio return', {
       takeId: take.id,
       hasAudioUrl: Boolean(audioUrl),
       type: typeof audioUrl,
@@ -7513,7 +7513,7 @@ class TTSManager {
   }
 
   async convertToSpeech(take) {
-    console.info('[Anything Reader][FirefoxPlayback] convertToSpeech', {
+    devLog('[Anything Reader][FirefoxPlayback] convertToSpeech', {
       takeId: take?.id,
       textLength: take?.text?.length,
       voiceId: this.selectedVoice?.id,
@@ -7547,20 +7547,20 @@ class TTSManager {
   async playAudio(audioUrl, takeIndex) {
     return new Promise((resolve, reject) => {
       const shouldUseWebAudio = this.shouldUseWebAudioPlayback();
-      console.info('[Anything Reader][FirefoxPlayback] playAudio branch', {
+      devLog('[Anything Reader][FirefoxPlayback] playAudio branch', {
         shouldUseWebAudio,
         type: typeof audioUrl,
         hasAudioBuffer: Boolean(audioUrl && typeof audioUrl === 'object' && audioUrl.audioBuffer),
       });
 
       if (shouldUseWebAudio && audioUrl && typeof audioUrl === 'object' && audioUrl.audioBuffer) {
-        console.info('[Anything Reader][FirefoxPlayback] playAudio webaudio', {
+        devLog('[Anything Reader][FirefoxPlayback] playAudio webaudio', {
           sampleRate: audioUrl.sampleRate,
           duration: audioUrl.audioBuffer.duration,
         });
         this.currentAudio = this.createWebAudioPlayer(audioUrl.audioBuffer, audioUrl.sampleRate);
                 } else {
-      console.info('[Anything Reader][FirefoxPlayback] playAudio htmlaudio', {
+      devLog('[Anything Reader][FirefoxPlayback] playAudio htmlaudio', {
         type: typeof audioUrl,
         isBlobUrl: typeof audioUrl === 'string' && audioUrl.startsWith('blob:'),
       });
@@ -7656,7 +7656,7 @@ class TTSManager {
       };
 
       this.currentAudio.play().then(() => {
-        console.info('[Anything Reader][FirefoxPlayback] play() resolved');
+        devLog('[Anything Reader][FirefoxPlayback] play() resolved');
         this.dispatchBackgroundMusicPlaybackState(true);
       }).catch((error) => {
         console.error('[Anything Reader][FirefoxPlayback] play() rejected', error);

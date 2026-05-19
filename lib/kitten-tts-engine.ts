@@ -1,4 +1,5 @@
 import * as ort from 'onnxruntime-web';
+import { devLog } from "@/lib/devlog.ts";
 import { phonemize } from 'phonemizer';
 import type { OrtWasmPaths } from '@/lib/ort-runtime.ts';
 
@@ -157,7 +158,7 @@ export function createKittenTtsEngine(options: KittenEngineOptions) {
       throw new Error('KittenTTS voices were not loaded.');
     }
     if (!kittenEngine.voices.has(voiceId)) {
-      console.warn('[Anything Reader][FirefoxBackground] KittenTTS voice fallback in use', {
+      devLog('[Anything Reader][FirefoxBackground] KittenTTS voice fallback in use', {
         requestedVoiceId: data.voiceId,
         resolvedVoiceId: voiceId,
         loadedVoices: [...kittenEngine.voices.keys()],

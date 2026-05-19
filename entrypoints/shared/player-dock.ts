@@ -407,7 +407,7 @@ export async function savePlayerDockState(manager: PlayerDockManager) {
     await chrome.storage.sync.set({ 'ar-floating-bar-state': state });
     localStorage.setItem('ar-floating-bar-state', JSON.stringify(state));
   } catch (error) {
-    console.warn('Failed to save floating bar state:', error);
+    devLog('Failed to save floating bar state:', error);
   }
 }
 
@@ -428,7 +428,7 @@ export async function loadPlayerDockState(manager: PlayerDockManager) {
           return;
         }
       } catch (error) {
-        console.warn('Failed to load floating bar state from localStorage:', error);
+        devLog('Failed to load floating bar state from localStorage:', error);
       }
 
       resolve(null);

@@ -1,4 +1,5 @@
 import { READ_CURRENT_PAGE_MESSAGE, type ReadResult } from '@/lib/native-messaging.ts';
+import { devLog } from "@/lib/devlog.ts";
 import {
   BACKGROUND_MUSIC_STORAGE_KEYS,
   BUILTIN_BACKGROUND_MUSIC_TRACKS,
@@ -49,14 +50,14 @@ const SUPERTONIC_VOICES: VoiceOption[] = [
 ];
 
 const KITTEN_VOICES: VoiceOption[] = [
-  { name: 'Bella', id: 'expr-voice-2-f', key: '1', description: 'Expressive female KittenTTS voice' },
-  { name: 'Jasper', id: 'expr-voice-2-m', key: '2', description: 'Expressive male KittenTTS voice' },
-  { name: 'Luna', id: 'expr-voice-3-f', key: '3', description: 'Clear female KittenTTS voice' },
-  { name: 'Bruno', id: 'expr-voice-3-m', key: '4', description: 'Clear male KittenTTS voice' },
-  { name: 'Rosie', id: 'expr-voice-4-f', key: '5', description: 'Warm female KittenTTS voice' },
-  { name: 'Hugo', id: 'expr-voice-4-m', key: '6', description: 'Warm male KittenTTS voice' },
-  { name: 'Kiki', id: 'expr-voice-5-f', key: '7', description: 'Lively female KittenTTS voice' },
-  { name: 'Leo', id: 'expr-voice-5-m', key: '8', description: 'Lively male KittenTTS voice' },
+  { name: 'Bella', id: 'expr-voice-2-f', key: '1', description: 'Expressive female voice' },
+  { name: 'Jasper', id: 'expr-voice-2-m', key: '2', description: 'Expressive male voice' },
+  { name: 'Luna', id: 'expr-voice-3-f', key: '3', description: 'Clear female voice' },
+  { name: 'Bruno', id: 'expr-voice-3-m', key: '4', description: 'Clear male voice' },
+  { name: 'Rosie', id: 'expr-voice-4-f', key: '5', description: 'Warm female voice' },
+  { name: 'Hugo', id: 'expr-voice-4-m', key: '6', description: 'Warm male voice' },
+  { name: 'Kiki', id: 'expr-voice-5-f', key: '7', description: 'Lively female voice' },
+  { name: 'Leo', id: 'expr-voice-5-m', key: '8', description: 'Lively male voice' },
 ];
 
 const VOICES_BY_MODEL: Record<TtsModel, VoiceOption[]> = {
@@ -67,7 +68,7 @@ const VOICES_BY_MODEL: Record<TtsModel, VoiceOption[]> = {
 const DEFAULT_SPEED = 1.0;
 const SPEED_OPTION_VALUES = ['1.4', '1.2', '1.0', '0.9'] as const;
 const DEFAULT_MODEL: TtsModel = 'supertonic';
-const HIGHLIGHT_COLOR_BASE = ['#d8ccad', '#6789ca', '#594743', '#504e49', '#a4a199', '#e5b560', '#941e34', '#bc6f25', '#455f54'];
+const HIGHLIGHT_COLOR_BASE = ['#941e34', '#d8ccad', '#6789ca', '#594743', '#504e49', '#a4a199', '#e5b560', '#bc6f25', '#455f54'];
 const DEFAULT_HIGHLIGHT_COLOR_INDEX = 0;
 const DEBUG_PREFIX = '[Anything Reader][Popup]';
 
@@ -141,7 +142,7 @@ async function initializePopup() {
   renderHighlightColorPicker(Number.isInteger(savedHighlightColorIndex) ? savedHighlightColorIndex : DEFAULT_HIGHLIGHT_COLOR_INDEX);
 
   const showNativeSection = shouldShowNativeMessagingSection();
-  console.log(DEBUG_PREFIX, 'Native messaging section visibility', {
+  devLog(DEBUG_PREFIX, 'Native messaging section visibility', {
     showNativeSection,
   });
   readerControlsSection.hidden = false;
@@ -526,7 +527,7 @@ function shouldShowNativeMessagingSection() {
   const isMac = isMacPlatform();
   const browserName = getBrowserName();
 
-  console.log(DEBUG_PREFIX, 'Native messaging visibility checks', {
+  devLog(DEBUG_PREFIX, 'Native messaging visibility checks', {
     isMac,
     browserName,
     showOnChrome: config.nativeHostMessaging.showOnChrome,
@@ -549,7 +550,7 @@ function shouldShowNativeMessagingSection() {
 
 function isMacPlatform() {
   const result = /Mac/i.test(navigator.userAgent) || /Mac/i.test(navigator.platform);
-  console.log(DEBUG_PREFIX, 'OS detection result', {
+  devLog(DEBUG_PREFIX, 'OS detection result', {
     userAgent: navigator.userAgent,
     platform: navigator.platform,
     isMac: result,
@@ -560,16 +561,16 @@ function isMacPlatform() {
 function getBrowserName() {
   const userAgent = navigator.userAgent.toLowerCase();
   if (userAgent.includes('firefox')) {
-    console.log(DEBUG_PREFIX, 'Browser detection result', { browserName: 'firefox', userAgent: navigator.userAgent });
+    devLog(DEBUG_PREFIX, 'Browser detection result', { browserName: 'firefox', userAgent: navigator.userAgent });
     return 'firefox' as const;
   }
 
   if (userAgent.includes('chrome') || userAgent.includes('chromium') || userAgent.includes('edg/')) {
-    console.log(DEBUG_PREFIX, 'Browser detection result', { browserName: 'chrome', userAgent: navigator.userAgent });
+    devLog(DEBUG_PREFIX, 'Browser detection result', { browserName: 'chrome', userAgent: navigator.userAgent });
     return 'chrome' as const;
   }
 
-  console.log(DEBUG_PREFIX, 'Browser detection result', { browserName: 'other', userAgent: navigator.userAgent });
+  devLog(DEBUG_PREFIX, 'Browser detection result', { browserName: 'other', userAgent: navigator.userAgent });
   return 'other' as const;
 }
 
