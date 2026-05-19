@@ -141,9 +141,9 @@ class TTSManager {
     this.isMiddleFloating = true;
 
     this.highlightColorBase = [
-      '#d8ccad', '#6789ca',
-      '#594743', '#504e49', '#a4a199', '#e5b560',
-      '#941e34', '#bc6f25', '#455f54',
+      '#941e34', '#d8ccad',
+      '#6789ca', '#594743', '#504e49', '#a4a199',
+      '#e5b560', '#bc6f25', '#455f54',
     ];
     this.highlightColorIndex = 0;
 
