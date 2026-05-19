@@ -104,7 +104,11 @@ export function resumePlayback(manager) {
   }
 
   if (manager.currentAudio && manager.isPaused) {
-    manager.currentAudio.play().then(() => {
+    const playResult = typeof manager.currentAudio.play === 'function'
+      ? manager.currentAudio.play()
+      : undefined;
+
+    Promise.resolve(playResult).then(() => {
       if (typeof manager.dispatchBackgroundMusicPlaybackState === 'function') {
         manager.dispatchBackgroundMusicPlaybackState(true);
       }

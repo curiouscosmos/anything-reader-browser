@@ -208,6 +208,10 @@ export function hideVoiceMenu(manager) {
 }
 
 export async function selectVoice(manager, voice) {
+  if (!voice) {
+    return;
+  }
+
   const previousVoiceId = manager.selectedVoice.id;
   manager.selectedVoice = voice;
 

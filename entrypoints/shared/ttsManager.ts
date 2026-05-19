@@ -9,6 +9,7 @@ import {
   mergeBackgroundMusicTracks,
   normalizeBackgroundMusicTrackId,
 } from '@/lib/background-music.ts';
+import { devLog } from '@/lib/devlog.ts';
 import { sendFirefoxTtsMessage } from '@/lib/firefox-tts-client.ts';
 import type { KittenTtsAction } from '@/lib/kitten-tts-engine.ts';
 import { EXTRACT_READABLE_TEXT_MESSAGE } from '@/lib/native-messaging.ts';
@@ -2061,13 +2062,20 @@ class TTSManager {
   }
 
   async saveVoiceSetting(voice) {
+    const safeVoice = voice || this.getDefaultVoiceForModel();
+
+    if (!safeVoice) {
+      this.warn('Skipping voice setting save because no voice is available.');
+      return;
+    }
+
     try {
       const voiceData = {
-        id: voice.id,
-        name: voice.name,
-        key: voice.key || null,
-        isCustom: voice.isCustom || false,
-        isTemp: voice.isTemp || false
+        id: safeVoice.id,
+        name: safeVoice.name,
+        key: safeVoice.key || null,
+        isCustom: safeVoice.isCustom || false,
+        isTemp: safeVoice.isTemp || false
       };
 
       await chrome.storage.sync.set({ 'ar-voice': voiceData });
@@ -2077,11 +2085,11 @@ class TTSManager {
       this.warn('Failed to save voice setting:', error);
       try {
         localStorage.setItem('ar-voice', JSON.stringify({
-          id: voice.id,
-          name: voice.name,
-          key: voice.key || null,
-          isCustom: voice.isCustom || false,
-          isTemp: voice.isTemp || false
+          id: safeVoice.id,
+          name: safeVoice.name,
+          key: safeVoice.key || null,
+          isCustom: safeVoice.isCustom || false,
+          isTemp: safeVoice.isTemp || false
         }));
       } catch (localError) {
         this.error('localStorage backup also failed:', localError);
@@ -2416,11 +2424,11 @@ class TTSManager {
             this.warn('Failed to load speed from localStorage as well:', error);
           }
 
-          resolve(1.2);
+          resolve(1.0);
         });
       } catch (error) {
         this.warn('Failed to load speed from Chrome storage, falling back to localStorage:', error);
-        resolve(1.2);
+        resolve(1.0);
       }
     });
   }
@@ -5487,7 +5495,7 @@ class TTSManager {
     }
 
     if (this.voiceLabel) {
-      this.voiceLabel.textContent = `🎵 Voice: ${this.selectedVoice.name}`;
+      this.voiceLabel.textContent = `🎵 Voice: ${this.selectedVoice?.name || 'Unknown'}`;
     }
   }
 
@@ -6366,6 +6374,10 @@ class TTSManager {
   }
 
   async selectVoice(voice) {
+    if (!voice) {
+      this.warn('Ignoring voice selection because no voice was provided.');
+      return;
+    }
     return selectVoice(this, voice);
   }
 
@@ -8146,6 +8158,11 @@ class TTSManager {
 
 
   async handleVoiceSelectGlobal(voice) {
+    if (!voice) {
+      this.warn('Ignoring global voice selection because no voice was provided.');
+      return;
+    }
+
     const previousVoiceId = this.selectedVoice.id;
     this.selectedVoice = voice;
 

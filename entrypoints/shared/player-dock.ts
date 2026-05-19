@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { devLog } from '@/lib/devlog.ts';
+
 type PlayerDockManager = {
   currentTheme: 'light' | 'dark';
   VOICES: Array<{ name: string; id: string; description?: string }>;
@@ -254,6 +256,10 @@ export function createPlayerDock(manager: PlayerDockManager) {
   voiceSelect.addEventListener('change', async (event) => {
     event.stopPropagation();
     const voice = manager.VOICES.find((candidate) => candidate.id === voiceSelect.value) || manager.getDefaultVoiceForModel();
+    if (!voice) {
+      devLog('Skipping voice change because no voice was available for the current model.');
+      return;
+    }
     await manager.selectVoice(voice);
   });
 
