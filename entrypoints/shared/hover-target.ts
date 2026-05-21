@@ -20,6 +20,12 @@ const BLOCKED_TAGS = new Set([
   'header',
   'footer',
   'aside',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
 ]);
 const BLOCKED_ROLES = new Set([
   'button',

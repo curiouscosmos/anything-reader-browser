@@ -103,3 +103,21 @@ test('hover target rejects svg/icon wrapper text', () => {
   assert.equal(isEligibleHoverTarget(iconLabel, iconLabel.textContent || ''), false);
   assert.equal(findHoverTargetElement(iconLabel, iconLabel.textContent || ''), null);
 });
+
+test('hover target rejects text nested inside heading tags', () => {
+  const dom = createDom(`
+    <main>
+      <article>
+        <h1><span id="heading-span">Article title</span></h1>
+      </article>
+    </main>
+  `);
+
+  const headingSpan = dom.window.document.getElementById('heading-span');
+  if (!headingSpan) {
+    throw new Error('missing heading span');
+  }
+
+  assert.equal(isEligibleHoverTarget(headingSpan, headingSpan.textContent || ''), false);
+  assert.equal(findHoverTargetElement(headingSpan, headingSpan.textContent || ''), null);
+});
