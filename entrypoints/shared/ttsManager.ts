@@ -33,6 +33,7 @@ import {
   getSpeedText,
   getSpeedTextForTinyUI,
 } from './speed-menu';
+import { findHoverTargetElement } from './hover-target';
 import {
   addToAudioCache,
   clearAllAudio,
@@ -3230,23 +3231,23 @@ class TTSManager {
 
     this.preTakes.forEach((take, index) => {
       if (take.element) {
-        const smallestElement = this.findSmallestTextContainer(take.element, take.text);
-        if (!smallestElement) {
+        const hoverTarget = this.findHoverTargetForTake(take.element, take.text);
+        if (!hoverTarget) {
           return;
         }
 
-        if (this.boundTakeHoverElements.has(smallestElement)) {
+        if (this.boundTakeHoverElements.has(hoverTarget)) {
           return;
         }
 
-        this.boundTakeHoverElements.add(smallestElement);
+        this.boundTakeHoverElements.add(hoverTarget);
 
-        smallestElement.addEventListener('mouseenter', (event) => {
+        hoverTarget.addEventListener('mouseenter', () => {
           this.currentHoverTake = take;
-          this.showTakeHoverIcon(take, smallestElement);
+          this.showTakeHoverIcon(take, hoverTarget);
         });
 
-        smallestElement.addEventListener('mouseleave', (event) => {
+        hoverTarget.addEventListener('mouseleave', (event) => {
           setTimeout(() => {
             try {
               const hoveredElement = this.safeElementFromPoint(event.clientX, event.clientY);
@@ -3255,8 +3256,10 @@ class TTSManager {
 
             if (newTake && newTake !== this.currentHoverTake) {
               this.currentHoverTake = newTake;
-              const newSmallestElement = this.findSmallestTextContainer(newTake.element, newTake.text);
-              this.showTakeHoverIcon(newTake, newSmallestElement);
+              const newHoverTarget = this.findHoverTargetForTake(newTake.element, newTake.text);
+              if (newHoverTarget) {
+                this.showTakeHoverIcon(newTake, newHoverTarget);
+              }
                 }
             }
             } catch (e) {
@@ -3265,6 +3268,10 @@ class TTSManager {
         });
       }
     });
+  }
+
+  findHoverTargetForTake(sourceElement, takeText) {
+    return findHoverTargetElement(sourceElement, takeText);
   }
 
   showTakeHoverIcon(take, element) {
@@ -3597,56 +3604,6 @@ class TTSManager {
         inThrottle = true;
         setTimeout(() => inThrottle = false, limit);
       }
-    }
-  }
-
-  findSmallestTextContainer(element, text) {
-    if (!element) return element;
-
-    try {
-    const tagName = element.tagName?.toLowerCase();
-
-    if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
-      return element;
-    }
-
-    const walker = document.createTreeWalker(
-      element,
-      NodeFilter.SHOW_ELEMENT,
-      {
-        acceptNode: (node) => {
-          const nodeText = node.textContent?.trim();
-          if (nodeText && text && nodeText.includes(text.substring(0, 50))) {
-            return NodeFilter.FILTER_ACCEPT;
-          }
-          return NodeFilter.FILTER_SKIP;
-        }
-      }
-    );
-
-    let smallestElement = element;
-      const elementRect = this.safeGetBoundingClientRect(element);
-      let smallestSize = elementRect ? (elementRect.width * elementRect.height) : Infinity;
-
-    let currentNode;
-    while (currentNode = walker.nextNode()) {
-        try {
-          const rect = this.safeGetBoundingClientRect(currentNode);
-          if (rect) {
-      const size = rect.width * rect.height;
-
-      if (size > 0 && size < smallestSize) {
-        smallestElement = currentNode;
-        smallestSize = size;
-            }
-          }
-        } catch (e) {
-      }
-    }
-
-    return smallestElement;
-    } catch (error) {
-      return element;
     }
   }
 
